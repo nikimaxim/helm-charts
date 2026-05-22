@@ -1,6 +1,6 @@
 # plantuml
 
-![Version: 3.37.0](https://img.shields.io/badge/Version-3.37.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2025.2](https://img.shields.io/badge/AppVersion-1.2025.2-informational?style=flat-square)
+![Version: 3.46.0](https://img.shields.io/badge/Version-3.46.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2026.3](https://img.shields.io/badge/AppVersion-1.2026.3-informational?style=flat-square)
 
 Helm chart for PlantUML Server, a web application to generate UML diagrams on-the-fly.
 
@@ -24,7 +24,7 @@ Helm chart for PlantUML Server, a web application to generate UML diagrams on-th
 To install the chart using the recommended OCI method you can use the following command.
 
 ```shell
-helm upgrade --install plantuml oci://ghcr.io/stevehipwell/helm-charts/plantuml --version 3.37.0
+helm upgrade --install plantuml oci://ghcr.io/stevehipwell/helm-charts/plantuml --version 3.46.0
 ```
 
 #### Verification
@@ -32,7 +32,7 @@ helm upgrade --install plantuml oci://ghcr.io/stevehipwell/helm-charts/plantuml 
 As the OCI chart release is signed by [Cosign](https://github.com/sigstore/cosign) you can verify the chart before installing it by running the following command.
 
 ```shell
-cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp 'https://github\.com/action-stars/helm-workflows/\.github/workflows/release\.yaml@.+' --certificate-github-workflow-repository stevehipwell/helm-charts --certificate-github-workflow-name Release ghcr.io/stevehipwell/helm-charts/plantuml:3.37.0
+cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp 'https://github\.com/action-stars/helm-workflows/\.github/workflows/release\.yaml@.+' --certificate-github-workflow-repository stevehipwell/helm-charts --certificate-github-workflow-name Release ghcr.io/stevehipwell/helm-charts/plantuml:3.46.0
 ```
 
 ### Non-OCI Repository
@@ -41,7 +41,7 @@ Alternatively you can use the legacy non-OCI method via the following commands.
 
 ```shell
 helm repo add stevehipwell https://stevehipwell.github.io/helm-charts/
-helm upgrade --install plantuml stevehipwell/plantuml --version 3.37.0
+helm upgrade --install plantuml stevehipwell/plantuml --version 3.46.0
 ```
 
 ## Values
@@ -50,6 +50,7 @@ helm upgrade --install plantuml stevehipwell/plantuml --version 3.37.0
 |-----|------|---------|-------------|
 | affinity | object | `{}` | Affinity settings for pod scheduling. If an explicit label selector is not provided for pod affinity or pod anti-affinity one will be created from the pod selector labels. |
 | args | list | `[]` | Args for the default container. |
+| automountServiceAccountToken | bool | `nil` | If the service account token should be mounted to the pod, this overrides `serviceAccount.automountToken`. |
 | autoscaling.behavior | object | `{}` | Behaviour configuration for the `HorizontalPodAutoscaler`. |
 | autoscaling.enabled | bool | `false` | If `true`, create a `HorizontalPodAutoscaler` to scale the `StatefulSet`. |
 | autoscaling.maxReplicas | int | `3` | Maximum number of replicas for the `HorizontalPodAutoscaler`. |
@@ -58,10 +59,19 @@ helm upgrade --install plantuml stevehipwell/plantuml --version 3.37.0
 | autoscaling.targetCPUUtilizationPercentage | int | `80` | **DEPRECATED** - Target average CPU utilization percentage. |
 | autoscaling.targetMemoryUtilizationPercentage | int | `nil` | **DEPRECATED** - Target average memory utilization percentage. |
 | caCerts.enabled | bool | `false` | If `true`, configure the JVM CA certificates from the provided secret. |
+| caCerts.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the CA certs container. |
+| caCerts.image.repository | string | `"docker.io/eclipse-temurin"` | Image repository for the CA certs container. |
+| caCerts.image.tag | string | `"17-jdk"` | Image tag for the CA certs container. |
 | caCerts.secret | string | `nil` | Name of the secret containing the CA certificates. |
 | commonLabels | object | `{}` | Labels to add to all chart resources. |
 | env | list | `[]` | Environment variables for the default container. |
 | fullnameOverride | string | `nil` | Override the full name of the chart. |
+| httpRoute.annotations | object | `{}` | Annotations to add to the `HTTPRoute` resource. |
+| httpRoute.enabled | bool | `false` | If `true`, create an `HTTPRoute` resource. |
+| httpRoute.hostnames | list | See _values.yaml_ | `HTTPRoute` hostnames. |
+| httpRoute.labels | object | `{}` | Labels to add to the `HTTPRoute` resource. |
+| httpRoute.parentRefs | list | See _values.yaml_ | `HTTPRoute` parent references. |
+| httpRoute.rules | list | See _values.yaml_ | `HTTPRoute` rules; if not set, a default rule routing all traffic to the HTTP service port will be created. |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the default container. |
 | image.pullSecrets | list | `[]` | **DEPRECATED** - Image pull secrets. |
 | image.repository | string | `"docker.io/plantuml/plantuml-server"` | Image repository for the default container. |

@@ -33,21 +33,24 @@ spec:
       {{- end }}
       {{- end }}
     spec:
-      {{- with .Values.imagePullSecrets }}
+    {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+    {{- end }}
       serviceAccountName: {{ include "thanos.rule.serviceAccountName" . }}
-      {{- with .Values.rule.podSecurityContext }}
+    {{- if ne .Values.rule.automountServiceAccountToken nil }}
+      automountServiceAccountToken: {{ .Values.rule.automountServiceAccountToken }}
+    {{- end }}
+    {{- with .Values.rule.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.rule.priorityClassName }}
+    {{- end }}
+    {{- with .Values.rule.priorityClassName }}
       priorityClassName: {{ . | quote }}
-      {{- end }}
-      {{- with .Values.rule.terminationGracePeriodSeconds }}
+    {{- end }}
+    {{- with .Values.rule.terminationGracePeriodSeconds }}
       terminationGracePeriodSeconds: {{ . }}
-      {{- end }}
+    {{- end }}
       containers:
         - name: thanos-rule
           {{- with .Values.rule.securityContext }}
@@ -70,16 +73,16 @@ spec:
           {{- end }}
           args:
             - rule
-            - --log.level={{ .Values.logLevel }}
-            - --log.format={{ .Values.logFormat }}
-            - --grpc-address=0.0.0.0:10901
-            - --http-address=0.0.0.0:10902
+            - {{ printf "--log.level=%s" .Values.logLevel }}
+            - {{ printf "--log.format=%s" .Values.logFormat }}
+            - {{ printf "--grpc-address=0.0.0.0:%d" (int .Values.rule.grpcPort) }}
+            - {{ printf "--http-address=0.0.0.0:%d" (int .Values.rule.httpPort) }}
             - --data-dir=/var/thanos/rule
             - --objstore.config-file=/etc/thanos/objstore.yaml
           {{- if .Values.autoGomemlimit.enabled }}
             - --enable-auto-gomemlimit
           {{- with .Values.autoGomemlimit.ratio }}
-            - --auto-gomemlimit.ratio={{ . }}
+            - {{ printf "--auto-gomemlimit.ratio=%v" . }}
           {{- end }}
           {{- end }}
           {{- if .Values.rule.instanceLabel }}
@@ -91,11 +94,17 @@ spec:
             - --alert.label-drop=receive_replica
           {{- end }}
           {{- range (concat .Values.additionalReplicaLabels .Values.query.replicaLabels) | uniq }}
-            - --alert.label-drop={{ . }}
+            - {{ printf "--alert.label-drop=%s" . }}
           {{- end }}
-            - --tsdb.retention={{ .Values.rule.retention }}
-            - --tsdb.block-duration={{ .Values.rule.blockDuration }}
+            - {{ printf "--tsdb.retention=%s" .Values.rule.retention }}
+            - {{ printf "--tsdb.block-duration=%s" .Values.rule.blockDuration }}
+          {{- if .Values.rule.overrideQueryEndpoints }}
+            {{- range .Values.rule.overrideQueryEndpoints }}
+            - {{ printf "--query=%s" . }}
+            {{- end }}
+          {{- else if .Values.query.enabled }}
             - {{ printf "--query=dnssrv+_http._tcp.%s.%s.svc.%s" (include "thanos.query.fullname" .) .Release.Namespace .Values.clusterDomain }}
+          {{- end }}
             - --rule-file=/etc/thanos/rules/*.yaml
             - --eval-interval={{ .Values.rule.evalInterval }}
             - --alertmanagers.config-file=/etc/thanos/alertmanagers-config.yaml
@@ -108,10 +117,10 @@ spec:
           ports:
             - name: grpc
               protocol: TCP
-              containerPort: 10901
+              containerPort: {{ .Values.rule.grpcPort }}
             - name: http
               protocol: TCP
-              containerPort: 10902
+              containerPort: {{ .Values.rule.httpPort }}
           livenessProbe:
             {{- toYaml .Values.rule.livenessProbe | nindent 12 }}
           readinessProbe:
@@ -142,7 +151,7 @@ spec:
         - name: config-reloader
           image: {{ include "thanos.configReloaderImage" . }}
           args:
-            - -webhook-url=http://localhost:10902/-/reload
+            - {{ printf "--webhook-url=http://localhost:%d/-/reload" (int .Values.rule.httpPort) }}
             - -volume-dir=/etc/thanos/rules
           volumeMounts:
             - mountPath: /etc/thanos/rules
@@ -197,6 +206,9 @@ spec:
         name: data
         labels:
           {{- include "thanos.rule.selectorLabels" . | nindent 10 }}
+        {{- with .Values.rule.persistence.labels }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         {{- with .Values.rule.persistence.annotations }}
         annotations:
           {{- toYaml . | nindent 10 }}

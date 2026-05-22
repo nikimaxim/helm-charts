@@ -6,31 +6,40 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "nexus3.labels" . | nindent 4 }}
+{{- with .Values.config.job.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+{{- end }}
 spec:
   template:
     metadata:
       name: {{ include "nexus3.configJob.name" . }}
       labels:
         {{- include "nexus3.configJob.selectorLabels" . | nindent 8 }}
+      {{- with .Values.config.job.podLabels }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap-config.yaml") . | sha256sum }}
         checksum/scripts: {{ include (print $.Template.BasePath "/configmap-scripts.yaml") . | sha256sum }}
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       restartPolicy: Never
+      {{- with .Values.config.job.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: config
           image: {{ include "nexus3.image" .Values.config.job.image }}
           imagePullPolicy: {{ .Values.config.job.image.pullPolicy }}
+          {{- with .Values.config.job.securityContext }}
           securityContext:
-            privileged: false
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            runAsUser: 65532
-            runAsGroup: 65532
-            capabilities:
-              drop:
-                - ALL
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             - name: NEXUS_HOST
               value: {{ printf "http://%s.%s.svc.cluster.local:%s" (include "nexus3.serviceName" .) .Release.Namespace (toString .Values.service.port) }}
@@ -55,8 +64,19 @@ spec:
             - mountPath: /opt/sonatype/nexus/config/secret/repo-credentials
               name: repo-credentials
           {{- end }}
+          {{- range .Values.config.blobStores }}
+          {{- if and (eq .type "s3") (dig "bucketConfiguration" "bucketSecurity" "secretAccessKey" "secret" nil .) }}
+            - mountPath: {{ printf "/opt/sonatype/nexus/config/secret/blobstore-%s.key" .name }}
+              name: {{ printf "blobstore-%s" .name }}
+              subPath: {{ default "secretAccessKey" .bucketConfiguration.bucketSecurity.secretAccessKey.key }}
+          {{- end }}
+          {{- end }}
           {{- range .Values.config.repos }}
-          {{- if dig "password" "secret" nil . }}
+          {{- if dig "bearerToken" "secret" nil . }}
+            - mountPath: {{ printf "/opt/sonatype/nexus/config/secret/repo-%s.token" .name }}
+              name: {{ printf "repo-%s" .name }}
+              subPath: {{ default "bearerToken" .bearerToken.key }}
+          {{- else if dig "password" "secret" nil . }}
             - mountPath: {{ printf "/opt/sonatype/nexus/config/secret/repo-%s.password" .name }}
               name: {{ printf "repo-%s" .name }}
               subPath: {{ default "password" .password.key }}
@@ -74,6 +94,10 @@ spec:
               name: ldap-password
               subPath: {{ .Values.config.ldap.authPassword.key }}
           {{- end }}
+        {{- with .Values.config.job.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+        {{- end }}
       volumes:
         - name: temp
           emptyDir: {}
@@ -90,8 +114,19 @@ spec:
           secret:
             secretName: {{ .Values.config.repoCredentials.secret }}
       {{- end }}
+      {{- range .Values.config.blobStores }}
+      {{- if and (eq .type "s3") (dig "bucketConfiguration" "bucketSecurity" "secretAccessKey" "secret" nil .) }}
+        - name: {{ printf "blobstore-%s" .name }}
+          secret:
+            secretName: {{ .bucketConfiguration.bucketSecurity.secretAccessKey.secret }}
+      {{- end }}
+      {{- end }}
       {{- range .Values.config.repos }}
-      {{- if dig "password" "secret" nil . }}
+      {{- if dig "bearerToken" "secret" nil . }}
+        - name: {{ printf "repo-%s" .name }}
+          secret:
+            secretName: {{ .bearerToken.secret }}
+      {{- else if dig "password" "secret" nil . }}
         - name: {{ printf "repo-%s" .name }}
           secret:
             secretName: {{ .password.secret }}
@@ -122,5 +157,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
   backoffLimit: 0
-  ttlSecondsAfterFinished: {{ .Values.config.job.ttlSecondsAfterFinished }}
+{{- with .Values.config.job.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ . }}
+{{- end -}}
   {{- end -}}

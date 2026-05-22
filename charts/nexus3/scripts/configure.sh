@@ -37,7 +37,7 @@ if [[ -f "${json_file}" ]]; then
   status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X PUT -H 'Content-Type: application/json' \
     -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/security/anonymous")"
   if [[ "${status_code}" -ne 200 ]]; then
-    error "Could not configure anonymous access. Http response code '${status_code}'."
+    error "Could not configure anonymous access (status code ${status_code})."
   fi
 
   echo "Anonymous access configured. Http response code '${status_code}'."
@@ -51,7 +51,7 @@ if [[ -f "${json_file}" ]]; then
   status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X PUT -H 'Content-Type: application/json' \
     -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/security/realms/active")"
   if [[ "${status_code}" -ne 204 ]]; then
-    error "Could not configure realms. Http response code '${status_code}'."
+    error "Could not configure realms (status code ${status_code})."
   fi
 
   echo "Realms configured. Http response code '${status_code}'."
@@ -87,19 +87,26 @@ for json_file in "${CONFIG_DIR}"/conf/*-blobstore.json; do
     type="$(jq -r '.type' "${json_file}")"
     name="$(jq -r '.name' "${json_file}")"
 
-    status_code=$(curl -sS -o /dev/null -w "%{http_code}" -X GET -H 'Content-Type: application/json' \
-      -u "${NEXUS_USER}:${NEXUS_PASSWORD}" "${NEXUS_HOST}/service/rest/v1/blobstores/${type}/${name}")
+    key_file="${CONFIG_DIR}/secret/blobstore-${name}.key"
+    if [[ -f "${key_file}" ]]; then
+      tmp_file="$(mktemp -p "${tmp_dir}")"
+      jq -r --arg key "$(cat "${key_file}")" '. * {bucketConfiguration: {bucketSecurity: {secretAccessKey: $key}}}' "${json_file}" >"${tmp_file}"
+      json_file="${tmp_file}"
+    fi
+
+    status_code=$(curl -sS -o /dev/null -w "%{http_code}" -X GET -H 'Content-Type: application/json' -u "${NEXUS_USER}:${NEXUS_PASSWORD}" "${NEXUS_HOST}/service/rest/v1/blobstores/${type}/${name}")
+
     if [[ "${status_code}" -eq 200 ]]; then
       status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X PUT -H 'Content-Type: application/json' \
         -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/blobstores/${type}/${name}")"
       if [[ "${status_code}" -ne 204 ]]; then
-        error "Could not update blob store '${name}'. Http response code '${status_code}'."
+        error "Could not update blob store '${name}' (status code ${status_code})."
       fi
     else
       status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H 'Content-Type: application/json' \
         -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/blobstores/${type}")"
       if [[ "${status_code}" -ne 204 ]] && [[ "${status_code}" -ne 201 ]]; then
-        error "Could not create blob store '${name}'. Http response code '${status_code}'."
+        error "Could not create blob store '${name}' (status code ${status_code})."
       fi
     fi
 
@@ -121,14 +128,14 @@ for script_file in /scripts/*.groovy; do
         -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "${data}" "${NEXUS_HOST}/service/rest/v1/script/${name}")
 
       if [[ "${status_code}" -ne 204 ]]; then
-        error "Could not update script '${name}'. Http response code '${status_code}'."
+        error "Could not update script '${name}' (status code ${status_code})."
       fi
     else
       status_code=$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H 'Content-Type: application/json' \
         -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "${data}" "${NEXUS_HOST}/service/rest/v1/script")
 
       if [[ "${status_code}" -ne 204 ]]; then
-        error "Could not create script '${name}'. Http response code '${status_code}'."
+        error "Could not create script '${name}' (status code ${status_code})."
       fi
     fi
 
@@ -145,7 +152,7 @@ for json_file in "${CONFIG_DIR}"/conf/*-cleanup.json; do
     status_code=$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H 'Content-Type: application/json' \
       -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/script/cleanup/run")
     if [[ "${status_code}" -ne 200 ]]; then
-      error "Could not configure cleanup policy '${name}'. Http response code '${status_code}'."
+      error "Could not configure cleanup policy '${name}' (status code ${status_code})."
     fi
 
     echo "Cleanup policy '${name}' configured. Http response code '${status_code}'."
@@ -188,11 +195,17 @@ for json_file in "${CONFIG_DIR}"/conf/*-repo.json; do
     json_file="${tmp_file}"
 
     if [[ "${type}" == "proxy" ]]; then
+      bearer_token_file="${CONFIG_DIR}/secret/repo-${name}.token"
       password_file="${CONFIG_DIR}/secret/repo-${name}.password"
       if [[ ! -f "${password_file}" ]]; then
         password_file="${CONFIG_DIR}/secret/repo-credentials/${name}"
       fi
-      if [[ -f "${password_file}" ]]; then
+
+      if [[ -f "${bearer_token_file}" ]]; then
+        tmp_file="$(mktemp -p "${tmp_dir}")"
+        jq -r --arg bearer_token "$(cat "${bearer_token_file}")" '. * {httpClient: {authentication: {bearerToken: $bearer_token}}}' "${json_file}" >"${tmp_file}"
+        json_file="${tmp_file}"
+      elif [[ -f "${password_file}" ]]; then
         tmp_file="$(mktemp -p "${tmp_dir}")"
         jq -r --arg password "$(cat "${password_file}")" '. * {httpClient: {authentication: {password: $password}}}' "${json_file}" > "${tmp_file}"
         json_file="${tmp_file}"
@@ -205,13 +218,13 @@ for json_file in "${CONFIG_DIR}"/conf/*-repo.json; do
       status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X PUT -H 'Content-Type: application/json' \
         -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/repositories/${format}/${type}/${name}")"
       if [[ "${status_code}" -ne 204 ]]; then
-        error "Could not update repository '${name}'. Http response code '${status_code}'."
+        error "Could not update repository '${name}' (status code ${status_code})."
       fi
     else
       status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H 'Content-Type: application/json' \
         -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/repositories/${format}/${type}")"
       if [[ "${status_code}" -ne 201 ]]; then
-        error "Could not create repository '${name}'. Http response code '${status_code}'."
+        error "Could not create repository '${name}' (status code ${status_code})."
       fi
     fi
 
@@ -219,6 +232,28 @@ for json_file in "${CONFIG_DIR}"/conf/*-repo.json; do
   fi
 done
 
+echo "Configuring privileges..."
+for json_file in "${CONFIG_DIR}"/conf/*-privilege.json; do
+  if [[ -f "${json_file}" ]]; then
+    name="$(jq -r '.name' "${json_file}")"
+    type="$(jq -r '.type' "${json_file}")"
+
+    status_code=$(curl -sS -o /dev/null -w "%{http_code}" -X GET -H 'Content-Type: application/json' -u "${NEXUS_USER}:${password}" "${NEXUS_HOST}/service/rest/v1/security/privileges/${name}")
+    if [[ "${status_code}" -eq 200 ]]; then
+      status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X PUT -H 'Content-Type: application/json' -u "${NEXUS_USER}:${password}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/security/privileges/${type}/${name}")"
+      if [[ "${status_code}" -ne 204 ]]; then
+        error "Could not update privilege '${name}' (status code ${status_code})."
+      fi
+    else
+      status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H 'Content-Type: application/json' -u "${NEXUS_USER}:${password}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/security/privileges/${type}")"
+      if [[ "${status_code}" -ne 201 ]]; then
+        error "Could not create privilege '${name}' (status code ${status_code})."
+      fi
+    fi
+
+    echo "Privilege '${name}' configured."
+  fi
+done
 
 echo "Configuring roles..."
 for json_file in "${CONFIG_DIR}"/conf/*-role.json; do
@@ -232,13 +267,13 @@ for json_file in "${CONFIG_DIR}"/conf/*-role.json; do
       status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X PUT -H 'Content-Type: application/json' \
         -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/security/roles/${id}")"
       if [[ "${status_code}" -ne 204 ]]; then
-        error "Could not update role '${id}'. Http response code '${status_code}'."
+        error "Could not update role '${id}' (status code ${status_code})."
       fi
     else
       status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H 'Content-Type: application/json' \
         -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/security/roles")"
       if [[ "${status_code}" -ne 200 ]]; then
-        error "Could not create role '${id}'. Http response code '${status_code}'."
+        error "Could not create role '${id}' (status code ${status_code})."
       fi
     fi
 
@@ -285,11 +320,12 @@ for json_file in "${CONFIG_DIR}"/conf/*-user.json; do
       status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X PUT -H 'Content-Type: application/json' \
         -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/security/users/${id}")"
       if [[ "${status_code}" -ne 204 ]]; then
-        error "Could not update user '${id}'. Http response code '${status_code}'."
+        error "Could not update user '${id}' (status code ${status_code})."
       fi
     else
       password_file="${CONFIG_DIR}/secret/user-${id}.password"
       if [[ ! -f "${password_file}" ]]; then
+        password_file="$(mktemp -p "${tmp_dir}")"
         echo "${RANDOM}" | md5sum | head -c 20 >"${password_file}"
       fi
 
@@ -300,7 +336,7 @@ for json_file in "${CONFIG_DIR}"/conf/*-user.json; do
       status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H 'Content-Type: application/json' \
         -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/security/users")"
       if [[ "${status_code}" -ne 200 ]]; then
-        error "Could not create user '${id}'. Http response code '${status_code}'."
+        error "Could not create user '${id}' (status code ${status_code})."
       fi
     fi
 
@@ -332,13 +368,13 @@ if [[ -f "${json_file}" ]]; then
     status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X PUT -H 'Content-Type: application/json' \
       -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/security/ldap/${name// /%20}")"
     if [[ "${status_code}" -ne 204 ]]; then
-      error "Could not update LDAP '${name}'. Http response code '${status_code}'."
+      error "Could not update LDAP '${name}' (status code ${status_code})."
     fi
   else
     status_code="$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H 'Content-Type: application/json' \
       -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/security/ldap")"
     if [[ "${status_code}" -ne 201 ]]; then
-      error "Could not create LDAP '${name}'. Http response code '${status_code}'."
+      error "Could not create LDAP '${name}' (status code ${status_code})."
     fi
   fi
 
@@ -354,7 +390,7 @@ for json_file in "${CONFIG_DIR}"/conf/*-task.json; do
     status_code=$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H 'Content-Type: application/json' \
       -u "${NEXUS_USER}:${NEXUS_PASSWORD}" -d "@${json_file}" "${NEXUS_HOST}/service/rest/v1/script/task/run")
     if [[ "${status_code}" -ne 200 ]]; then
-      error "Could not configure task '${name}'. Http response code '${status_code}'."
+      error "Could not configure task '${name}' (status code ${status_code})."
     fi
 
     echo "Task '${name}' configured. Http response code '${status_code}'."

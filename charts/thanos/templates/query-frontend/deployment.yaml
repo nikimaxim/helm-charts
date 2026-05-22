@@ -1,4 +1,4 @@
-{{- if .Values.queryFrontend.enabled -}}
+{{- if and .Values.query.enabled .Values.queryFrontend.enabled -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,21 +29,24 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      {{- with .Values.imagePullSecrets }}
+    {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+    {{- end }}
       serviceAccountName: {{ include "thanos.queryFrontend.serviceAccountName" . }}
-      {{- with .Values.queryFrontend.podSecurityContext }}
+    {{- if ne .Values.queryFrontend.automountServiceAccountToken nil }}
+      automountServiceAccountToken: {{ .Values.queryFrontend.automountServiceAccountToken }}
+    {{- end }}
+    {{- with .Values.queryFrontend.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.queryFrontend.priorityClassName }}
+    {{- end }}
+    {{- with .Values.queryFrontend.priorityClassName }}
       priorityClassName: {{ . | quote }}
-      {{- end }}
-      {{- with .Values.queryFrontend.terminationGracePeriodSeconds }}
+    {{- end }}
+    {{- with .Values.queryFrontend.terminationGracePeriodSeconds }}
       terminationGracePeriodSeconds: {{ . }}
-      {{- end }}
+    {{- end }}
       containers:
         - name: thanos-query-frontend
           {{- with .Values.queryFrontend.securityContext }}
@@ -62,23 +65,23 @@ spec:
           {{- end }}
           args:
             - query-frontend
-            - --log.level={{ .Values.logLevel }}
-            - --log.format={{ .Values.logFormat }}
-            - --http-address=0.0.0.0:10902
+            - {{ printf "--log.level=%s" .Values.logLevel }}
+            - {{ printf "--log.format=%s" .Values.logFormat }}
+            - {{ printf "--http-address=0.0.0.0:%d" (int .Values.queryFrontend.httpPort) }}
           {{- if .Values.autoGomemlimit.enabled }}
             - --enable-auto-gomemlimit
           {{- with .Values.autoGomemlimit.ratio }}
-            - --auto-gomemlimit.ratio={{ . }}
+            - {{ printf "--auto-gomemlimit.ratio=%v" . }}
           {{- end }}
-          {{- end }}
-            - {{ printf "--query-frontend.downstream-url=http://%s.%s.svc.%s:10902" (include "thanos.query.fullname" .) .Release.Namespace .Values.clusterDomain}}
+            {{- end }}
+            - {{ printf "--query-frontend.downstream-url=http://%s.%s.svc.%s:%d" (include "thanos.query.fullname" .) .Release.Namespace .Values.clusterDomain (int .Values.query.service.httpPort) }}
           {{- with .Values.queryFrontend.extraArgs }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
           ports:
             - name: http
               protocol: TCP
-              containerPort: 10902
+              containerPort: {{ .Values.queryFrontend.httpPort }}
           livenessProbe:
             {{- toYaml .Values.queryFrontend.livenessProbe | nindent 12 }}
           readinessProbe:

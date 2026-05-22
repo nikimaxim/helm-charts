@@ -26,7 +26,7 @@ jdkImage:
   # -- Image repository for the JDK container.
   repository: docker.io/eclipse-temurin
   # -- Image tag for the JDK container, this will be omitted if set to `-`.
-  tag: 17-jdk
+  tag: 21-jdk
   # -- (string) Optional image digest for the JDK container.
   digest:
   # -- Image pull policy for the JDK container.
@@ -99,6 +99,26 @@ ingress:
   #       - nexus-docker-hosted-2.local
   #     secretName: nexus-local-tls
 
+httpRoute:
+  # -- If `true`, create `HTTPRoute` resources.
+  enabled: false
+  # -- Annotations to add to the `HTTPRoute` resources.
+  annotations: {}
+  # -- Labels to add to the `HTTPRoute` resources.
+  labels: {}
+  # -- (list) `HTTPRoute` parent references.
+  # @default -- See _values.yaml_
+  parentRefs: []
+  #   - name: gateway
+  #     namespace: gateway
+  # -- (list) `HTTPRoute` hostnames; do not include hosts defined in `service.additionalPorts` as they will be added automatically.
+  # @default -- See _values.yaml_
+  hostnames: []
+  #   - nexus.local
+  # -- (list) `HTTPRoute` rules for the primary hostname; if not set, a default rule routing all traffic to the HTTP service port will be created.
+  # @default -- See _values.yaml_
+  rules: []
+
 # -- Number of replicas to create; modifying this requires the license to be configured.
 replicas: 1
 
@@ -130,12 +150,36 @@ podLabels: {}
 # -- Annotations to add to the pod.
 podAnnotations: {}
 
+# -- (bool) If the service account token should be mounted to the pod, this overrides `serviceAccount.automountToken`.
+automountServiceAccountToken:
+
 # -- Security context for the pod.
 podSecurityContext:
   runAsNonRoot: false
   fsGroup: 200
   seccompProfile:
     type: RuntimeDefault
+
+# -- Security context for non-root init containers.
+initNonRootSecurityContext:
+  privileged: false
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  capabilities:
+    drop:
+      - ALL
+
+# -- Security context for root init container.
+initRootSecurityContext:
+  privileged: false
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: false
+  runAsUser: 0
+  runAsGroup: 0
 
 # -- (string) Priority class name for the pod.
 priorityClassName:
@@ -229,6 +273,9 @@ resources: {}
 #     cpu: 100m
 #     memory: 128Mi
 
+# -- Resources for the init containers (not sidecars).
+initResources: {}
+
 # -- Extra init container to run before the default container.
 extraInitContainers: []
 
@@ -292,6 +339,9 @@ plugins: []
 #   - name: nexus-repository-composer
 #     url: https://repo1.maven.org/maven2/org/sonatype/nexus/plugins/nexus-repository-composer/0.0.29/nexus-repository-composer-0.0.29-bundle.kar
 
+# -- If `true`, the _chown-data-dir_ init container will be enabled, this should not be required for most CSI drivers but is left in for backwards compatibility. For new chart installs this should be set to `false`.
+chownDataDir: true
+
 rootPassword:
   # -- (string) Name of the secret containing the root password.
   secret:
@@ -319,6 +369,31 @@ config:
     affinity: {}
     # -- Node taints which will be tolerated for scheduling the config job.
     tolerations: []
+    
+    # -- Annotations to apply to the config job.
+    annotations: {}
+    # -- Labels to add to the config job pod.
+    podLabels: {}
+    # -- Security context for the pod.
+    podSecurityContext:
+      runAsNonRoot: false
+      fsGroup: 200
+      seccompProfile:
+        type: RuntimeDefault
+    # -- Security context for the config container containers.
+    securityContext:
+      privileged: false
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 65532
+      runAsGroup: 65532
+      capabilities:
+        drop:
+          - ALL
+    # -- Resources for the config container.
+    resources: {}
+
   # -- Prunes configuration; based on the REST API (API reference docs require an existing Nexus installation and can be found at **Administration** under _System_ → _API_).
   prunes:
     # -- If `true`, deletes existing users except admin, anonymous
@@ -327,6 +402,7 @@ config:
     blobStores: false
     # -- If `true`, deletes existing repositories
     repositories: false
+
   anonymous:
     # -- If `true`, enable anonymous access.
     enabled: false
@@ -354,17 +430,19 @@ config:
   #     softQuota:
   #       type: spaceRemainingQuota
   #       limit: 500
-  #   - name: ExampleS3BlobStore
-  #     type: s3
-  #     bucketConfiguration:
-  #       bucket:
-  #         region: us-east-1
-  #         name: example-bucket-name
-  #         prefix: /
-  #         expiration: 3
-  #       #bucketSecurity:  # If not using Instance Profile
-  #       #  accessKeyId: access-key-id
-  #       #  secretAccessKey: secret-access-key
+  # - name: ExampleS3BlobStore
+  #   type: s3
+  #   bucketConfiguration:
+  #     bucket:
+  #       region: us-east-1
+  #       name: example-bucket-name
+  #       prefix: /
+  #       expiration: 3
+  #     # bucketSecurity:  # Uncomment if not using Instance Profile
+  #     #   accessKeyId: access-key-id
+  #     #   secretAccessKey:
+  #     #     secret: test-blob
+  #     #     key: secret-access-key
   # -- Cleanup configuration.
   cleanup: []
   #   - name: ExampleCleanup
@@ -394,9 +472,21 @@ config:
   #     cleanup:
   #       policyNames:
   #         - ExampleCleanup
+  #     bearerToken:
+  #       secret: test-repo
+  #       key: bearerToken
   #     password:
   #       secret: test-repo
   #       key: password
+  # -- Privileges configuration; based on the REST API (API reference docs require an existing Nexus installation and can be found at **Administration** under _System_ → _API_).
+  privileges: []
+  #   - type: application
+  #     name: nx-metrics-all
+  #     description: All permissions for Metrics
+  #     readOnly: true
+  #     actions:
+  #       - ALL
+  #     domain: metrics
   # -- Roles configuration; based on the REST API (API reference docs require an existing Nexus installation and can be found at **Administration** under _System_ → _API_).
   roles: []
   #   - id: nexus-administrators
@@ -474,7 +564,7 @@ config:
   #     typeId: blobstore.compact
   #     crontab: "0 0 2 * * ?"
   #     attributes:
-  #       blobStoreName: "default"
+  #       blobstoreName: "default"
 
 manualMaintenanceMode:
   # -- If `true`, enable manual maintenance mode. This is running the default container with a custom command, reducing the termination grace period to 10s and disabling the probes.

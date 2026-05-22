@@ -42,6 +42,8 @@ serviceMonitor:
   enabled: false
   # -- Additional labels for the service monitor.
   additionalLabels: {}
+  # -- Label to use as the service monitor job label.
+  jobLabel: app.kubernetes.io/component-instance
   # -- Additional endpoint configuration for the service monitor endpoint.
   endpointConfig: {}
   # -- (int) **DEPRECATED** - _Prometheus_ scrape interval for the service monitor endpoint.
@@ -62,10 +64,10 @@ autoGomemlimit:
 # -- If `true`, configure the store endpoints with `--endpoint-group` so they're queried round-robin rather than fanout. (**EXPERIMENTAL**).
 storeEndpointGroup: false
 
-# -- Additional endpoints external to the chart to be configured with `--endpoint`.
+# -- Additional endpoints external to the chart to be configured with `--endpoint`, these values can be templated.
 additionalEndpoints: []
 
-# -- Additional endpoint groups external to the chart to be configured with `--endpoint-group` (**EXPERIMENTAL**).
+# -- Additional endpoint groups external to the chart to be configured with `--endpoint-group`, these values can be templated (**EXPERIMENTAL**).
 additionalEndpointGroups: []
 
 # -- Additional replica labels external to the chart.
@@ -102,6 +104,10 @@ compact:
   service:
     # -- Annotations to add to the _Compact_ service.
     annotations: {}
+    # -- Labels to add to the _Compact_ service.
+    labels: {}
+    # -- HTTP port for the _Compact_ service.
+    httpPort: 10902
 
   # -- Update strategy for the _Compact_ stateful set.
   updateStrategy: {}
@@ -111,6 +117,9 @@ compact:
 
   # -- Annotations to add to the _Compact_ pod.
   podAnnotations: {}
+
+  # -- (bool) If the service account token should be mounted to the _Compact_ pod, this overrides `compact.serviceAccount.automountToken`.
+  automountServiceAccountToken:
 
   # -- Security context for the _Compact_ pod.
   # @default -- See _values.yaml_
@@ -148,6 +157,9 @@ compact:
   # -- Additional args for the _Compact_ pod default container.
   extraArgs: []
 
+  # -- HTTP port for the _Compact_ pod default container.
+  httpPort: 10902
+
   # -- Liveness probe configuration for the _Compact_ pod default container.
   # @default -- See _values.yaml_
   livenessProbe:
@@ -178,10 +190,10 @@ compact:
   resources: {}
 
   persistence:
-    # -- If `true`, either use an existing `PersistentVolumeClaim` via `compact.persistence.existingClaim` or create a `PersistentVolumeClaim` for the _Compact_ pod data.
+    # -- If `true`, create a `PersistentVolumeClaim` for the _Compact_ pod data.
     enabled: false
-    # -- (string) If this is set and `compact.persistence.enabled` is `true` the existing PVC defined will be used instead of a new one being created.
-    existingClaim:
+    # -- Labels to add to the _Compact_ pod PVC.
+    labels: {}
     # -- Annotations to add to the _Compact_ pod PVC.
     annotations: {}
     # -- Access mode for the _Compact_ pod PVC.
@@ -214,10 +226,22 @@ compact:
   tolerations: []
 
 query:
+  # -- If `true`, create the _Query_ component.
+  enabled: true
+
+  # -- If `true`, enable DNS service discovery.
+  enableDnsDiscovery: true
+
+  # -- **DEPRECATED** - Labels added to metrics to show the replica recording the data (`--query.replica-label`). Use `additionalReplicaLabels` instead.
+  replicaLabels: []
+
+  # -- **DEPRECATED** - Additional stores to configure query with (`--store`), these values can be templated. Use `additionalEndpoints` instead.
+  additionalStores: []
+
   serviceAccount:
     # -- If `true`, create a new `ServiceAccount` for the _Query_ component.
     create: true
-    # -- (string) If this is set and `compact.serviceAccount.create` is `true` this will be used for the created _Query_ component service account name, if this is set and `compact.serviceAccount.create` is `false` then this will define an existing service account to use for the _Query_ component.
+    # -- (string) If this is set and `query.serviceAccount.create` is `true` this will be used for the created _Query_ component service account name, if this is set and `query.serviceAccount.create` is `false` then this will define an existing service account to use for the _Query_ component.
     name:
     # -- Labels to add to the _Query_ service account.
     labels: {}
@@ -229,8 +253,16 @@ query:
   service:
     # -- Annotations to add to the _Query_ service.
     annotations: {}
+    # -- Labels to add to the _Query_ service.
+    labels: {}
+    # -- GRPC port for the _Query_ service.
+    grpcPort: 10901
+    # -- HTTP port for the _Query_ service.
+    httpPort: 10902
     # -- (string) Traffic distribution for the _Query_ service.
     trafficDistribution:
+    # -- Service type for the _Query_ service.
+    type: ClusterIP
 
   ingress:
     # -- If `true`, create an `Ingress` for the _Query_ service.
@@ -245,12 +277,58 @@ query:
     # @default -- See _values.yaml_
     hosts: []
     #   - chart-example.local
+    # -- Path for the _Query_ service gRPC ingress rules.
+    grpcPath: /
+    # -- Hosts for the _Query_ service gRPC ingress rules.
+    # @default -- See _values.yaml_
+    grpcHosts: []
+    #   - chart-example-grpc.local
     # -- TLS configuration for the _Query_ service ingress.
     # @default -- See _values.yaml_
     tls: []
     #   - hosts:
     #       - chart-example.local
     #     secretName: chart-example-tls
+
+  httpRoute:
+    # -- If `true`, create an `HTTPRoute` resource for the _Query_ service.
+    enabled: false
+    # -- Annotations to add to the _Query_ service `HTTPRoute`.
+    annotations: {}
+    # -- Labels to add to the _Query_ service `HTTPRoute`.
+    labels: {}
+    # -- (list) `HTTPRoute` parent references for the _Query_ service.
+    # @default -- See _values.yaml_
+    parentRefs: []
+    #   - name: gateway
+    #     namespace: gateway
+    # -- (list) `HTTPRoute` hostnames for the _Query_ service.
+    # @default -- See _values.yaml_
+    hostnames: []
+    #   - chart-example.local
+    # -- (list) `HTTPRoute` rules for the _Query_ service; if not set, a default rule routing all traffic to the HTTP service port will be created.
+    # @default -- See _values.yaml_
+    rules: []
+
+  grpcRoute:
+    # -- If `true`, create a `GRPCRoute` resource for the _Query_ gRPC service.
+    enabled: false
+    # -- Annotations to add to the _Query_ gRPC service `GRPCRoute`.
+    annotations: {}
+    # -- Labels to add to the _Query_ gRPC service `GRPCRoute`.
+    labels: {}
+    # -- (list) `GRPCRoute` parent references for the _Query_ gRPC service.
+    # @default -- See _values.yaml_
+    parentRefs: []
+    #   - name: gateway
+    #     namespace: gateway
+    # -- (list) `GRPCRoute` hostnames for the _Query_ gRPC service.
+    # @default -- See _values.yaml_
+    hostnames: []
+    #   - chart-example-grpc.local
+    # -- (list) `GRPCRoute` rules for the _Query_ gRPC service; if not set, a default rule routing all traffic to the gRPC service port will be created.
+    # @default -- See _values.yaml_
+    rules: []
 
   # -- Number of _Query_ replicas to create.
   replicas: 1
@@ -285,6 +363,9 @@ query:
 
   # -- Annotations to add to the _Query_ pod.
   podAnnotations: {}
+
+  # -- (bool) If the service account token should be mounted to the _Query_ pod, this overrides `query.serviceAccount.automountToken`.
+  automountServiceAccountToken:
 
   # -- Security context for the _Query_ pod.
   # @default -- See _values.yaml_
@@ -321,6 +402,12 @@ query:
 
   # -- Additional args for the _Query_ pod default container.
   extraArgs: []
+
+  # -- GRPC port used by the _Query_ pod default container.
+  grpcPort: 10901
+
+  # -- HTTP port used by the _Query_ pod default container.
+  httpPort: 10902
 
   # -- Liveness probe configuration for the _Query_ pod default container.
   # @default -- See _values.yaml_
@@ -369,14 +456,8 @@ query:
   # -- Node taints the _Query_ pod will tolerate for scheduling.
   tolerations: []
 
-  # -- **DEPRECATED** - Labels added to metrics to show the replica recording the data (`--query.replica-label`); use `additionalReplicaLabels` instead.
-  replicaLabels: []
-
-  # -- **DEPRECATED** - Additional stores to configure query with (`--store`); use `additionalEndpoints` instead.
-  additionalStores: []
-
 queryFrontend:
-  # -- If `true`, create the _Thanos Query Frontend_ component.
+  # -- If `true`, create the _Query Frontend_ component if the _Query_ component is also enabled.
   enabled: false
 
   serviceAccount:
@@ -394,8 +475,14 @@ queryFrontend:
   service:
     # -- Annotations to add to the _Query Frontend_ service.
     annotations: {}
+    # -- Labels to add to the _Query Frontend_ service.
+    labels: {}
+    # -- HTTP port for the _Query Frontend_ service.
+    httpPort: 10902
     # -- (string) Traffic distribution for the _Query Frontend_ service.
     trafficDistribution:
+    # -- Service type for the _Query Frontend_ service.
+    type: ClusterIP
 
   ingress:
     # -- If `true`, create an `Ingress` for the _Query Frontend_ service.
@@ -416,6 +503,26 @@ queryFrontend:
     #   - hosts:
     #       - chart-example.local
     #     secretName: chart-example-tls
+
+  httpRoute:
+    # -- If `true`, create an `HTTPRoute` resource for the _Query Frontend_ service.
+    enabled: false
+    # -- Annotations to add to the _Query Frontend_ service `HTTPRoute`.
+    annotations: {}
+    # -- Labels to add to the _Query Frontend_ service `HTTPRoute`.
+    labels: {}
+    # -- (list) `HTTPRoute` parent references for the _Query Frontend_ service.
+    # @default -- See _values.yaml_
+    parentRefs: []
+    #   - name: gateway
+    #     namespace: gateway
+    # -- (list) `HTTPRoute` hostnames for the _Query Frontend_ service.
+    # @default -- See _values.yaml_
+    hostnames: []
+    #   - chart-example.local
+    # -- (list) `HTTPRoute` rules for the _Query Frontend_ service; if not set, a default rule routing all traffic to the HTTP service port will be created.
+    # @default -- See _values.yaml_
+    rules: []
 
   # -- Number of _Query Frontend_ replicas to create.
   replicas: 1
@@ -450,6 +557,9 @@ queryFrontend:
 
   # -- Annotations to add to the _Query Frontend_ pod.
   podAnnotations: {}
+
+  # -- (bool) If the service account token should be mounted to the _Query Frontend_ pod, this overrides `queryFrontend.serviceAccount.automountToken`.
+  automountServiceAccountToken:
 
   # -- Security context for the _Query Frontend_ pod.
   # @default -- See _values.yaml_
@@ -486,6 +596,9 @@ queryFrontend:
 
   # -- Additional args for the _Query Frontend_ pod default container.
   extraArgs: []
+
+  # -- HTTP port used by the _Query Frontend_ pod default container.
+  httpPort: 10902
 
   # -- Liveness probe configuration for the _Query Frontend_ pod default container.
   # @default -- See _values.yaml_
@@ -560,6 +673,14 @@ receive:
     service:
       # -- Annotations to add to the _Receive Ingestor_ service.
       annotations: {}
+      # -- Labels to add to the _Receive Ingestor_ service.
+      labels: {}
+      # -- GRPC port for the _Receive Ingestor_ service.
+      grpcPort: 10901
+      # -- HTTP port for the _Receive Ingestor_ service.
+      httpPort: 10902
+      # -- HTTP remote write port for the _Receive Ingestor_ service.
+      httpRemoteWritePort: 19291
 
     # -- Number of _Receive Ingestor_ replicas to create.
     replicas: 1
@@ -582,6 +703,9 @@ receive:
 
     # -- Annotations to add to the _Receive Ingestor_ pod.
     podAnnotations: {}
+
+    # -- (bool) If the service account token should be mounted to the _Receive Ingestor_ pod, this overrides `receive.ingestor.serviceAccount.automountToken`.
+    automountServiceAccountToken:
 
     # -- Security context for the _Receive Ingestor_ pod.
     # @default -- See _values.yaml_
@@ -619,6 +743,15 @@ receive:
     # -- Additional args for the _Receive Ingestor_ pod default container.
     extraArgs: []
 
+    # -- GRPC port used by the _Receive Ingestor_ pod default container.
+    grpcPort: 10901
+
+    # -- HTTP port used by the _Receive Ingestor_ pod default container.
+    httpPort: 10902
+
+    # -- HTTP remote write port used by the _Receive Ingestor_ pod default container.
+    httpRemoteWritePort: 19291
+
     # -- Liveness probe configuration for the _Receive Ingestor_ pod default container.
     # @default -- See _values.yaml_
     livenessProbe:
@@ -649,10 +782,10 @@ receive:
     resources: {}
 
     persistence:
-      # -- If `true`, either use an existing `PersistentVolumeClaim` via `compact.persistence.existingClaim` or create a `PersistentVolumeClaim` for the _Receive Ingestor_ pod data.
+      # -- If `true`, create a `PersistentVolumeClaim` for the _Receive Ingestor_ pod data.
       enabled: false
-      # -- (string) If this is set and `compact.persistence.enabled` is `true` the existing PVC defined will be used instead of a new one being created.
-      existingClaim:
+      # -- Labels to add to the _Receive Ingestor_ pod PVC.
+      labels: {}
       # -- Annotations to add to the _Receive Ingestor_ pod PVC.
       annotations: {}
       # -- Access mode for the _Receive Ingestor_ pod PVC.
@@ -700,6 +833,18 @@ receive:
     service:
       # -- Annotations to add to the _Receive Router_ service.
       annotations: {}
+      # -- Labels to add to the _Receive Router_ service.
+      labels: {}
+      # -- GRPC port for the _Receive Router_ service.
+      grpcPort: 10901
+      # -- HTTP port for the _Receive Router_ service.
+      httpPort: 10902
+      # -- HTTP remote write port for the _Receive Router_ service.
+      httpRemoteWritePort: 19291
+      # -- (string) Traffic distribution for the _Receive Router_ service.
+      trafficDistribution:
+      # -- Service type for the _Receive Router_ service.
+      type: ClusterIP
 
     ingress:
       # -- If `true`, create an `Ingress` for the _Receive Router_ service.
@@ -720,6 +865,26 @@ receive:
       #   - hosts:
       #       - chart-example.local
       #     secretName: chart-example-tls
+
+    httpRoute:
+      # -- If `true`, create an `HTTPRoute` resource for the _Receive Router_ service.
+      enabled: false
+      # -- Annotations to add to the _Receive Router_ service `HTTPRoute`.
+      annotations: {}
+      # -- Labels to add to the _Receive Router_ service `HTTPRoute`.
+      labels: {}
+      # -- (list) `HTTPRoute` parent references for the _Receive Router_ service.
+      # @default -- See _values.yaml_
+      parentRefs: []
+      #   - name: gateway
+      #     namespace: gateway
+      # -- (list) `HTTPRoute` hostnames for the _Receive Router_ service.
+      # @default -- See _values.yaml_
+      hostnames: []
+      #   - chart-example.local
+      # -- (list) `HTTPRoute` rules for the _Receive Router_ service; if not set, default rules routing `/api/v1/receive` to the remote write port and all other traffic to the HTTP port will be created.
+      # @default -- See _values.yaml_
+      rules: []
 
     # -- Number of _Receive Router_ replicas to create.
     replicas: 1
@@ -754,6 +919,9 @@ receive:
 
     # -- Annotations to add to the _Receive Router_ pod.
     podAnnotations: {}
+
+    # -- (bool) If the service account token should be mounted to the _Receive Router_ pod, this overrides `receive.router.serviceAccount.automountToken`.
+    automountServiceAccountToken:
 
     # -- Security context for the _Receive Router_ pod.
     # @default -- See _values.yaml_
@@ -790,6 +958,15 @@ receive:
 
     # -- Additional args for the _Receive Router_ pod default container.
     extraArgs: []
+
+    # -- GRPC port used by the _Receive Router_ pod default container.
+    grpcPort: 10901
+
+    # -- HTTP port used by the _Receive Router_ pod default container.
+    httpPort: 10902
+
+    # -- HTTP remote write port used by the _Receive Router_ pod default container.
+    httpRemoteWritePort: 19291
 
     # -- Liveness probe configuration for the _Receive Router_ pod default container.
     # @default -- See _values.yaml_
@@ -842,6 +1019,9 @@ rule:
   # -- If `true`, create the _Thanos Rule_ component.
   enabled: false
 
+  # -- Override query endpoints for the _Rule_ component (`--query`).
+  overrideQueryEndpoints: []
+
   # -- If `true`, add a `thanos_rule` label to `<NAMESPACE>/<RULE_FULLNAME>` on a `Rule` metrics.
   instanceLabel: false
 
@@ -853,6 +1033,25 @@ rule:
 
   # -- Rule eval interval for the _Rule_ component (`--eval-interval`).
   evalInterval: 1m
+
+  alertmanagersConfig:
+    # -- If `true`, create a `Secret` for the _Rule_ component alertmanagers configuration.
+    create: true
+    # -- (string) If this is set and `rule.alertmanagersConfig.create` is `true` this will be used for the created secret name, if this is set and `rule.alertmanagersConfig.create` is `false` then this will define an existing secret to use.
+    name:
+    # -- Secret key for the _Rule_ component alertmanagers configuration.
+    key: config
+    # -- Alert managers configuration for the _Rule_ component.
+    value: |-
+      alertmanagers: []
+
+  rules:
+    # -- If `true`, create a `ConfigMap` for the _Rule_ component rules.
+    create: true
+    # -- (string) If this is set and `rule.rules.create` is `true` this will be used for the created config map name, if this is set and `rule.rules.create` is `false` then this will define an existing config map to use.
+    name:
+    # Rules for the _Rule_ component.
+    value: |-
 
   serviceAccount:
     # -- If `true`, create a new `ServiceAccount` for the _Rule_ component.
@@ -869,6 +1068,16 @@ rule:
   service:
     # -- Annotations to add to the _Rule_ service.
     annotations: {}
+    # -- Labels to add to the _Rule_ service.
+    labels: {}
+    # -- GRPC port for the _Rule_ service.
+    grpcPort: 10901
+    # -- HTTP port for the _Rule_ service.
+    httpPort: 10902
+    # -- (string) Traffic distribution for the _Rule_ service.
+    trafficDistribution:
+    # -- Service type for the _Rule_ service.
+    type: ClusterIP
 
   ingress:
     # -- If `true`, create an `Ingress` for the _Rule_ service.
@@ -889,6 +1098,26 @@ rule:
     #   - hosts:
     #       - chart-example.local
     #     secretName: chart-example-tls
+
+  httpRoute:
+    # -- If `true`, create an `HTTPRoute` resource for the _Rule_ service.
+    enabled: false
+    # -- Annotations to add to the _Rule_ service `HTTPRoute`.
+    annotations: {}
+    # -- Labels to add to the _Rule_ service `HTTPRoute`.
+    labels: {}
+    # -- (list) `HTTPRoute` parent references for the _Rule_ service.
+    # @default -- See _values.yaml_
+    parentRefs: []
+    #   - name: gateway
+    #     namespace: gateway
+    # -- (list) `HTTPRoute` hostnames for the _Rule_ service.
+    # @default -- See _values.yaml_
+    hostnames: []
+    #   - chart-example.local
+    # -- (list) `HTTPRoute` rules for the _Rule_ service; if not set, a default rule routing all traffic to the HTTP service port will be created.
+    # @default -- See _values.yaml_
+    rules: []
 
   # -- Number of _Rule_ replicas to create.
   replicas: 1
@@ -911,6 +1140,9 @@ rule:
 
   # -- Annotations to add to the _Rule_ pod.
   podAnnotations: {}
+
+  # -- (bool) If the service account token should be mounted to the _Rule_ pod, this overrides `rule.serviceAccount.automountToken`.
+  automountServiceAccountToken:
 
   # -- Security context for the _Rule_ pod.
   # @default -- See _values.yaml_
@@ -948,6 +1180,12 @@ rule:
   # -- Additional args for the _Rule_ pod default container.
   extraArgs: []
 
+  # -- GRPC port used by the _Rule_ pod default container.
+  grpcPort: 10901
+
+  # -- HTTP port used by the _Rule_ pod default container.
+  httpPort: 10902
+
   # -- Liveness probe configuration for the _Rule_ pod default container.
   # @default -- See _values.yaml_
   livenessProbe:
@@ -978,10 +1216,10 @@ rule:
   resources: {}
 
   persistence:
-    # -- If `true`, either use an existing `PersistentVolumeClaim` via `compact.persistence.existingClaim` or create a `PersistentVolumeClaim` for the _Rule_ pod data.
+    # -- If `true`, create a `PersistentVolumeClaim` for the _Rule_ pod data.
     enabled: false
-    # -- (string) If this is set and `compact.persistence.enabled` is `true` the existing PVC defined will be used instead of a new one being created.
-    existingClaim:
+    # -- Labels to add to the _Rule_ pod PVC.
+    labels: {}
     # -- Annotations to add to the _Rule_ pod PVC.
     annotations: {}
     # -- Access mode for the _Rule_ pod PVC.
@@ -1030,26 +1268,10 @@ rule:
   # -- Node taints the _Rule_ pod will tolerate for scheduling.
   tolerations: []
 
-  alertmanagersConfig:
-    # -- If `true`, create a `Secret` for the _Rule_ component alertmanagers configuration.
-    create: true
-    # -- (string) If this is set and `rule.alertmanagersConfig.create` is `true` this will be used for the created secret name, if this is set and `rule.alertmanagersConfig.create` is `false` then this will define an existing secret to use.
-    name:
-    # -- Secret key for the _Rule_ component alertmanagers configuration.
-    key: config
-    # -- Alert managers configuration for the _Rule_ component.
-    value: |-
-      alertmanagers: []
-
-  rules:
-    # -- If `true`, create a `ConfigMap` for the _Rule_ component rules.
-    create: true
-    # -- (string) If this is set and `rule.rules.create` is `true` this will be used for the created config map name, if this is set and `rule.rules.create` is `false` then this will define an existing config map to use.
-    name:
-    # Rules for the _Rule_ component.
-    value: |-
-
 storeGateway:
+  # -- If `true`, create the _Store Gateway_ component.
+  enabled: true
+
   serviceAccount:
     # -- If `true`, create a new `ServiceAccount` for the _Store Gateway_ component.
     create: true
@@ -1065,6 +1287,12 @@ storeGateway:
   service:
     # -- Annotations to add to the _Store Gateway_ service.
     annotations: {}
+    # -- Labels to add to the _Store Gateway_ service.
+    labels: {}
+    # -- GRPC port for the _Store Gateway_ service.
+    grpcPort: 10901
+    # -- HTTP port for the _Store Gateway_ service.
+    httpPort: 10902
     # -- (string) Traffic distribution for the _Store Gateway_ service.
     trafficDistribution:
 
@@ -1089,6 +1317,9 @@ storeGateway:
 
   # -- Annotations to add to the _Store Gateway_ pod.
   podAnnotations: {}
+
+  # -- (bool) If the service account token should be mounted to the _Store Gateway_ pod, this overrides `storeGateway.serviceAccount.automountToken`.
+  automountServiceAccountToken:
 
   # -- Security context for the _Store Gateway_ pod.
   # @default -- See _values.yaml_
@@ -1126,6 +1357,12 @@ storeGateway:
   # -- Additional args for the _Store Gateway_ pod default container.
   extraArgs: []
 
+  # -- GRPC port used by the _Store Gateway_ pod default container.
+  grpcPort: 10901
+
+  # -- HTTP port used by the _Store Gateway_ pod default container.
+  httpPort: 10902
+
   # -- Liveness probe configuration for the _Store Gateway_ pod default container.
   # @default -- See _values.yaml_
   livenessProbe:
@@ -1162,10 +1399,10 @@ storeGateway:
   extraVolumeMounts: []
 
   persistence:
-    # -- If `true`, either use an existing `PersistentVolumeClaim` via `compact.persistence.existingClaim` or create a `PersistentVolumeClaim` for the _Store Gateway_ pod data.
+    # -- If `true`, create a `PersistentVolumeClaim` for the _Store Gateway_ pod data.
     enabled: false
-    # -- (string) If this is set and `compact.persistence.enabled` is `true` the existing PVC defined will be used instead of a new one being created.
-    existingClaim:
+    # -- Labels to add to the _Store Gateway_ pod PVC.
+    labels: {}
     # -- Annotations to add to the _Store Gateway_ pod PVC.
     annotations: {}
     # -- Access mode for the _Store Gateway_ pod PVC.

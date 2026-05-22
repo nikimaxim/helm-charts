@@ -5,14 +5,14 @@ on:
     branches:
       - main
   schedule:
-    - cron:  '30 1 * * 6'
+    - cron: "30 1 * * 6"
 
 permissions: read-all
 
 jobs:
   workflow:
     name: Reusable Workflow
-    uses: action-stars/generic-workflows/.github/workflows/scorecard.yaml@c2a066bdade42e69baf710d589ade9056d0615d0 # v0.5.2
+    uses: action-stars/generic-workflows/.github/workflows/scorecard.yaml@d4724b3ea1635d9cc7064f5302cc411e54d52334 # v0.9.0
     permissions:
       id-token: write
       security-events: write

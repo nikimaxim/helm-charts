@@ -1,4 +1,4 @@
-{{- if .Values.query.ingress.enabled -}}
+{{- if and .Values.query.enabled .Values.query.ingress.enabled -}}
 {{- $apiIsStable := eq (include "thanos.ingress.isStable" .) "true" -}}
 {{- $ingressSupportsPathType := eq (include "thanos.ingress.supportsPathType" .) "true" -}}
 {{- $serviceName := include "thanos.query.fullname" . -}}
@@ -35,6 +35,25 @@ spec:
             {{- else }}
               serviceName: {{ $serviceName }}
               servicePort: http
+            {{- end }}
+  {{- end }}
+  {{- range .Values.query.ingress.grpcHosts }}
+    - host: {{ quote . }}
+      http:
+        paths:
+          - path: {{ $.Values.query.ingress.grpcPath }}
+            {{- if $ingressSupportsPathType }}
+            pathType: Prefix
+            {{- end }}
+            backend:
+            {{- if $apiIsStable }}
+              service:
+                name: {{ $serviceName }}
+                port:
+                  name: grpc
+            {{- else }}
+              serviceName: {{ $serviceName }}
+              servicePort: grpc
             {{- end }}
   {{- end }}
 {{- if .Values.query.ingress.tls }}

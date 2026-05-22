@@ -23,13 +23,28 @@ jobs:
       k8s_versions: ${{ steps.setup.outputs.k8s_versions }}
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 2
 
+      - name: Set-up rumdl
+        uses: action-stars/install-tool-from-github-release@1fa61c3bea52eca3bcdb1f5c961a3b113fe7fa54 # v0.2.6
+        with:
+          github_token: ${{ github.token }}
+          owner: rvben
+          repository: rumdl
+          filename_format: "{name}-v{version}-{arch}-{os}.{ext}"
+          arch_amd64: x86_64
+          os_linux: unknown-linux-gnu
+          check_command: rumdl --version
+          version: latest
+
+      - name: Lint markdown files
+        run: rumdl check --output-format github .
+
       - name: Chart changes
         id: changed
-        uses: tj-actions/changed-files@ed68ef82c095e0d48ec87eccea555d944a631a4c # v46.0.5
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
         with:
           files: charts/**
 
@@ -43,7 +58,7 @@ jobs:
 
   validate:
     name: Validate
-    uses: action-stars/helm-workflows/.github/workflows/validate.yaml@0b498f1b9096b956f66f50954864e477dc3a639e # v0.8.5
+    uses: action-stars/helm-workflows/.github/workflows/validate.yaml@0f9a4a90be6ea74c9ec60ee4f75e669d8d9f4a76 # v0.12.0
     needs: setup
     if: needs.setup.outputs.changed == 'true'
     permissions:
@@ -63,18 +78,24 @@ jobs:
 
   check:
     name: Check
-    needs: validate
     if: always()
+    needs:
+      - setup
+      - validate
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash
     steps:
       - name: Check
+        env:
+          INPUT_RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
           set -euo pipefail
-
-          if [[ "${{ needs.validate.result }}" == "failure" ]] || [[ "${{ needs.validate.result }}" == "cancelled" ]]; then
-            echo "::error::Workflow failed!"
-            exit 1
-          fi
+          read -a results <<< "${INPUT_RESULTS}"
+          for result in "${results[@]}"; do
+            if [[ "${result}" == "failure" ]] || [[ "${result}" == "cancelled" ]]; then
+              echo "::error::Workflow failed!"
+              exit 1
+            fi
+          done

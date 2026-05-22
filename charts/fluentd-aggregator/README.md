@@ -1,6 +1,6 @@
 # fluentd-aggregator
 
-![Version: 5.0.1](https://img.shields.io/badge/Version-5.0.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.0.1](https://img.shields.io/badge/AppVersion-3.0.1-informational?style=flat-square)
+![Version: 5.7.0](https://img.shields.io/badge/Version-5.7.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.7.0](https://img.shields.io/badge/AppVersion-3.7.0-informational?style=flat-square)
 
 Helm chart for Fluentd running as an aggregation StatefulSet and using the fluent-plugin-route router.
 
@@ -25,7 +25,7 @@ Helm chart for Fluentd running as an aggregation StatefulSet and using the fluen
 To install the chart using the recommended OCI method you can use the following command.
 
 ```shell
-helm upgrade --install fluentd-aggregator oci://ghcr.io/stevehipwell/helm-charts/fluentd-aggregator --version 5.0.1
+helm upgrade --install fluentd-aggregator oci://ghcr.io/stevehipwell/helm-charts/fluentd-aggregator --version 5.7.0
 ```
 
 #### Verification
@@ -33,7 +33,7 @@ helm upgrade --install fluentd-aggregator oci://ghcr.io/stevehipwell/helm-charts
 As the OCI chart release is signed by [Cosign](https://github.com/sigstore/cosign) you can verify the chart before installing it by running the following command.
 
 ```shell
-cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp 'https://github\.com/action-stars/helm-workflows/\.github/workflows/release\.yaml@.+' --certificate-github-workflow-repository stevehipwell/helm-charts --certificate-github-workflow-name Release ghcr.io/stevehipwell/helm-charts/fluentd-aggregator:5.0.1
+cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp 'https://github\.com/action-stars/helm-workflows/\.github/workflows/release\.yaml@.+' --certificate-github-workflow-repository stevehipwell/helm-charts --certificate-github-workflow-name Release ghcr.io/stevehipwell/helm-charts/fluentd-aggregator:5.7.0
 ```
 
 ### Non-OCI Repository
@@ -42,7 +42,7 @@ Alternatively you can use the legacy non-OCI method via the following commands.
 
 ```shell
 helm repo add stevehipwell https://stevehipwell.github.io/helm-charts/
-helm upgrade --install fluentd-aggregator stevehipwell/fluentd-aggregator --version 5.0.1
+helm upgrade --install fluentd-aggregator stevehipwell/fluentd-aggregator --version 5.7.0
 ```
 
 ## Values
@@ -51,11 +51,16 @@ helm upgrade --install fluentd-aggregator stevehipwell/fluentd-aggregator --vers
 |-----|------|---------|-------------|
 | affinity | object | `{}` | Affinity settings for pod scheduling. If an explicit label selector is not provided for pod affinity or pod anti-affinity one will be created from the pod selector labels. |
 | args | list | `[]` | Args for the default container. |
+| automountServiceAccountToken | bool | `nil` | If the service account token should be mounted to the pod, this overrides `serviceAccount.automountToken`. |
 | autoscaling.behavior | object | `{}` | Behaviour configuration for the `HorizontalPodAutoscaler`. |
 | autoscaling.enabled | bool | `false` | If `true`, create a `HorizontalPodAutoscaler` to scale the `StatefulSet`. |
 | autoscaling.maxReplicas | int | `3` | Maximum number of replicas for the `HorizontalPodAutoscaler`. |
 | autoscaling.metrics | list | See _values.yaml_ | Metrics configuration for the `HorizontalPodAutoscaler`. |
 | autoscaling.minReplicas | int | `1` | Minimum number of replicas for the `HorizontalPodAutoscaler`. |
+| bashImage.digest | string | `nil` | Optional image digest for the bash containers. |
+| bashImage.pullPolicy | string | `"IfNotPresent"` | Image pull policy for bash containers. |
+| bashImage.repository | string | `"cgr.dev/chainguard/bash"` | Image repository for bash containers. |
+| bashImage.tag | string | `"latest"` | Image tag for bash containers, this will be omitted if set to `-`. |
 | commonLabels | object | `{}` | Labels to add to all chart resources. |
 | config.filters | string | See _values.yaml_ | Fluentd filter configuration. |
 | config.metrics | bool | `true` | If `true`, configure metrics |
@@ -68,12 +73,14 @@ helm upgrade --install fluentd-aggregator stevehipwell/fluentd-aggregator --vers
 | extraVolumeMounts | list | `[]` | Extra volume mounts for the default container. |
 | extraVolumes | list | `[]` | Extra volumes for the pod. |
 | fullnameOverride | string | `nil` | Override the full name of the chart. |
+| httpRoutes | list | See _values.yaml_ | `HTTPRoute` resources, each input plugin will need its own. |
 | image.digest | string | `nil` | Optional image digest for the default container. |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the default container. |
 | image.repository | string | `"ghcr.io/stevehipwell/fluentd-aggregator"` | Image repository for the default container. |
 | image.tag | string | `nil` | Image tag for the default container, this will default to `.Chart.AppVersion` if not set and will be omitted if set to `-`. |
 | imagePullSecrets | list | `[]` | Image pull secrets. |
 | ingresses | list | See _values.yaml_ | Ingresses, each input plugin will need it's own. |
+| initNonRootSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"privileged":false,"readOnlyRootFilesystem":true,"runAsGroup":65532,"runAsNonRoot":true,"runAsUser":65532}` | Security context for non-root init containers. |
 | livenessProbe | object | See _values.yaml_ | Liveness probe configuration for the default container. |
 | minReadySeconds | int | `nil` | Min ready seconds for the `StatefulSet`. |
 | nameOverride | string | `nil` | Override the name of the chart. |

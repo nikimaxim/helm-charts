@@ -1,3 +1,4 @@
+{{- if .Values.storeGateway.enabled -}}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -32,21 +33,24 @@ spec:
       {{- end }}
       {{- end }}
     spec:
-      {{- with .Values.imagePullSecrets }}
+    {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+    {{- end }}
       serviceAccountName: {{ include "thanos.storeGateway.serviceAccountName" . }}
-      {{- with .Values.storeGateway.podSecurityContext }}
+    {{- if ne .Values.storeGateway.automountServiceAccountToken nil }}
+      automountServiceAccountToken: {{ .Values.storeGateway.automountServiceAccountToken }}
+    {{- end }}
+    {{- with .Values.storeGateway.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.storeGateway.priorityClassName }}
+    {{- end }}
+    {{- with .Values.storeGateway.priorityClassName }}
       priorityClassName: {{ . | quote }}
-      {{- end }}
-      {{- with .Values.storeGateway.terminationGracePeriodSeconds }}
+    {{- end }}
+    {{- with .Values.storeGateway.terminationGracePeriodSeconds }}
       terminationGracePeriodSeconds: {{ . }}
-      {{- end }}
+    {{- end }}
       containers:
         - name: thanos-store-gateway
           {{- with .Values.storeGateway.securityContext }}
@@ -69,16 +73,16 @@ spec:
           {{- end }}
           args:
             - store
-            - --log.level={{ .Values.logLevel }}
-            - --log.format={{ .Values.logFormat }}
-            - --grpc-address=0.0.0.0:10901
-            - --http-address=0.0.0.0:10902
+            - {{ printf "--log.level=%s" .Values.logLevel }}
+            - {{ printf "--log.format=%s" .Values.logFormat }}
+            - {{ printf "--grpc-address=0.0.0.0:%d" (int .Values.storeGateway.grpcPort) }}
+            - {{ printf "--http-address=0.0.0.0:%d" (int .Values.storeGateway.httpPort) }}
             - --data-dir=/var/thanos/store
             - --objstore.config-file=/etc/thanos/objstore.yaml
           {{- if .Values.autoGomemlimit.enabled }}
             - --enable-auto-gomemlimit
           {{- with .Values.autoGomemlimit.ratio }}
-            - --auto-gomemlimit.ratio={{ . }}
+            - {{ printf "--auto-gomemlimit.ratio=%v" . }}
           {{- end }}
           {{- end }}
           {{- with .Values.storeGateway.extraArgs }}
@@ -87,10 +91,10 @@ spec:
           ports:
             - name: grpc
               protocol: TCP
-              containerPort: 10901
+              containerPort: {{ .Values.storeGateway.grpcPort }}
             - name: http
               protocol: TCP
-              containerPort: 10902
+              containerPort: {{ .Values.storeGateway.httpPort }}
           livenessProbe:
             {{- toYaml .Values.storeGateway.livenessProbe | nindent 12 }}
           readinessProbe:
@@ -145,6 +149,9 @@ spec:
         name: data
         labels:
           {{- include "thanos.storeGateway.selectorLabels" . | nindent 10 }}
+        {{- with .Values.storeGateway.persistence.labels }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         {{- with .Values.storeGateway.persistence.annotations }}
         annotations:
           {{- toYaml . | nindent 10 }}
@@ -168,3 +175,4 @@ spec:
     whenScaled: {{ ternary "Retain" "Delete" .Values.storeGateway.persistence.retainScaled }}
   {{- end }}
   {{- end }}
+{{- end -}}

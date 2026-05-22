@@ -44,31 +44,31 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      {{- with .Values.imagePullSecrets }}
+    {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+    {{- end }}
       serviceAccountName: {{ include "nexus3.serviceAccountName" . }}
-      {{- with .Values.podSecurityContext }}
+    {{- if ne .Values.automountServiceAccountToken nil }}
+      automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
+    {{- end }}
+    {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.priorityClassName }}
+    {{- end }}
+    {{- with .Values.priorityClassName }}
       priorityClassName: {{ . | quote }}
-      {{- end }}
+    {{- end }}
       terminationGracePeriodSeconds: {{ ternary 10 .Values.terminationGracePeriodSeconds .Values.manualMaintenanceMode.enabled }}
       initContainers:
       {{- if .Values.caCerts.enabled }}
         - name: import-ca-certs
           image: {{ include "nexus3.image" .Values.jdkImage }}
           imagePullPolicy: {{ .Values.jdkImage.pullPolicy }}
+          {{- with .Values.initRootSecurityContext }}
           securityContext:
-            privileged: false
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            runAsNonRoot: false
-            runAsUser: 0
-            runAsGroup: 0
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.env }}
           env:
             {{- toYaml . | nindent 12 }}
@@ -83,21 +83,19 @@ spec:
               name: data
             - mountPath: /nexus-data/secrets/cas
               name: ca-certs
+          {{- with .Values.initResources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       {{- end }}
       {{- if .Values.plugins }}
         - name: download-plugins
           image: {{ include "nexus3.image" .Values.bashImage }}
           imagePullPolicy: {{ .Values.bashImage.pullPolicy }}
+          {{- with .Values.initNonRootSecurityContext }}
           securityContext:
-            privileged: false
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            runAsUser: 65532
-            runAsGroup: 65532
-            capabilities:
-              drop:
-                - ALL
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.env }}
           env:
             {{- toYaml . | nindent 12 }}
@@ -109,20 +107,22 @@ spec:
               subPath: download-plugins.sh
             - mountPath: /deploy
               name: deploy
+          {{- with .Values.initResources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       {{- end }}
       {{- with .Values.extraInitContainers }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.chownDataDir }}
         - name: chown-data-dir
           image: {{ include "nexus3.image" .Values.bashImage }}
           imagePullPolicy: {{ .Values.bashImage.pullPolicy }}
+          {{- with .Values.initRootSecurityContext }}
           securityContext:
-            privileged: false
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            runAsNonRoot: false
-            runAsUser: 0
-            runAsGroup: 0
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.env }}
           env:
             {{- toYaml . | nindent 12 }}
@@ -134,6 +134,11 @@ spec:
               subPath: chown-data-dir.sh
             - mountPath: /nexus-data
               name: data
+          {{- with .Values.initResources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- end }}
       {{- if (semverCompare ">= 1.29-0" .Capabilities.KubeVersion.Version) }}
         - name: tail-request-log
           restartPolicy: Always
@@ -208,11 +213,11 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          image: {{ include "nexus3.image" (merge .Values.image (dict "tag" (printf "%s-java17-ubi" .Chart.AppVersion))) }}
+          image: {{ include "nexus3.image" (merge .Values.image (dict "tag" (printf "%s-ubi" .Chart.AppVersion))) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: INSTALL4J_ADD_VM_PARAMS
-              value: {{ printf "-Djava.util.prefs.userRoot=${NEXUS_DATA}/javaprefs%s %s" (ternary " -Djavax.net.ssl.trustStore=${NEXUS_DATA}/keystores/cacerts" "" .Values.caCerts.enabled) .Values.install4jAddVmParams }}
+              value: {{ printf "-Djava.util.prefs.userRoot=${NEXUS_DATA}/javaprefs -Dlogback.maxHistory=%d -Dlogback.access.maxHistory=%d%s %s" (.Values.logback.maxHistory | int) (.Values.logback.maxHistory | int) (ternary " -Djavax.net.ssl.trustStore=${NEXUS_DATA}/keystores/cacerts" "" .Values.caCerts.enabled) .Values.install4jAddVmParams }}
           {{- if .Values.rootPassword.secret }}
             - name: NEXUS_SECURITY_RANDOMPASSWORD
               value: "false"
@@ -254,8 +259,12 @@ spec:
               name: temp
             - mountPath: /nexus-data
               name: data
-            - mountPath: /opt/sonatype/nexus/etc/logback
+            - mountPath: /opt/sonatype/nexus/etc/logback/logback.xml
               name: logback
+              subPath: logback.xml
+            - mountPath: /nexus-data/etc/logback/logback-tasklogfile-appender-override.xml
+              name: logback
+              subPath: logback-tasklogfile-appender-override.xml
             - mountPath: /nexus-data/etc/nexus.properties
               name: properties
               subPath: nexus.properties

@@ -1,3 +1,4 @@
+{{- if .Values.query.enabled -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -28,21 +29,24 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      {{- with .Values.imagePullSecrets }}
+    {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+    {{- end }}
       serviceAccountName: {{ include "thanos.query.serviceAccountName" . }}
-      {{- with .Values.query.podSecurityContext }}
+    {{- if ne .Values.query.automountServiceAccountToken nil }}
+      automountServiceAccountToken: {{ .Values.query.automountServiceAccountToken }}
+    {{- end }}
+    {{- with .Values.query.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.query.priorityClassName }}
+    {{- end }}
+    {{- with .Values.query.priorityClassName }}
       priorityClassName: {{ . | quote }}
-      {{- end }}
-      {{- with .Values.query.terminationGracePeriodSeconds }}
+    {{- end }}
+    {{- with .Values.query.terminationGracePeriodSeconds }}
       terminationGracePeriodSeconds: {{ . }}
-      {{- end }}
+    {{- end }}
       containers:
         - name: thanos-query
           {{- with .Values.query.securityContext }}
@@ -61,31 +65,35 @@ spec:
           {{- end }}
           args:
             - query
-            - --log.level={{ .Values.logLevel }}
-            - --log.format={{ .Values.logFormat }}
-            - --grpc-address=0.0.0.0:10901
-            - --http-address=0.0.0.0:10902
+            - {{ printf "--log.level=%s" .Values.logLevel }}
+            - {{ printf "--log.format=%s" .Values.logFormat }}
+            - {{ printf "--grpc-address=0.0.0.0:%d" (int .Values.query.grpcPort) }}
+            - {{ printf "--http-address=0.0.0.0:%d" (int .Values.query.httpPort) }}
           {{- if .Values.autoGomemlimit.enabled }}
             - --enable-auto-gomemlimit
           {{- with .Values.autoGomemlimit.ratio }}
-            - --auto-gomemlimit.ratio={{ . }}
+            - {{ printf "--auto-gomemlimit.ratio=%v" . }}
           {{- end }}
           {{- end }}
           {{- range (concat .Values.additionalReplicaLabels .Values.query.replicaLabels (ternary (list "rule_replica") (list) .Values.rule.enabled ) (ternary (list "receive_replica") (list) .Values.receive.enabled )) | uniq }}
-            - --query.replica-label={{ . }}
+            - {{ printf "--query.replica-label=%s" . }}
           {{- end }}
+          {{- if .Values.query.enableDnsDiscovery }}
+          {{- if .Values.storeGateway.enabled }}
             - {{ printf "--endpoint%s=dnssrv+_grpc._tcp.%s-headless.%s.svc.%s" (ternary "-group" "" .Values.storeEndpointGroup) (include "thanos.storeGateway.fullname" .) .Release.Namespace .Values.clusterDomain}}
+          {{- end }}
           {{- if .Values.rule.enabled }}
             - {{ printf "--endpoint=dnssrv+_grpc._tcp.%s-headless.%s.svc.%s" (include "thanos.rule.fullname" .) .Release.Namespace .Values.clusterDomain}}
           {{- end }}
           {{- if .Values.receive.enabled }}
             - {{ printf "--endpoint=dnssrv+_grpc._tcp.%s-headless.%s.svc.%s" (include "thanos.receive.ingestor.fullname" .) .Release.Namespace .Values.clusterDomain}}
           {{- end }}
+          {{- end }}
           {{- range (concat .Values.additionalEndpoints .Values.query.additionalStores) | uniq }}
-            - --endpoint={{ . }}
+            - {{ printf "--endpoint=%s" (tpl . $) }}
           {{- end }}
           {{- range .Values.additionalEndpointGroups }}
-            - --endpoint-group={{ . }}
+            - {{ printf "--endpoint-group=%s" (tpl . $) }}
           {{- end }}
           {{- with .Values.query.extraArgs }}
             {{- toYaml . | nindent 12 }}
@@ -93,10 +101,10 @@ spec:
           ports:
             - name: grpc
               protocol: TCP
-              containerPort: 10901
+              containerPort: {{ .Values.query.grpcPort }}
             - name: http
               protocol: TCP
-              containerPort: 10902
+              containerPort: {{ .Values.query.httpPort }}
           livenessProbe:
             {{- toYaml .Values.query.livenessProbe | nindent 12 }}
           readinessProbe:
@@ -131,3 +139,4 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- end }}

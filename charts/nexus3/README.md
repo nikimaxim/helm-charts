@@ -1,6 +1,6 @@
 # nexus3
 
-![Version: 5.10.0](https://img.shields.io/badge/Version-5.10.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.80.0](https://img.shields.io/badge/AppVersion-3.80.0-informational?style=flat-square)
+![Version: 5.22.0](https://img.shields.io/badge/Version-5.22.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.92.2](https://img.shields.io/badge/AppVersion-3.92.2-informational?style=flat-square)
 
 Helm chart for Sonatype Nexus 3 OSS.
 
@@ -25,7 +25,7 @@ Helm chart for Sonatype Nexus 3 OSS.
 To install the chart using the recommended OCI method you can use the following command.
 
 ```shell
-helm upgrade --install nexus3 oci://ghcr.io/stevehipwell/helm-charts/nexus3 --version 5.10.0
+helm upgrade --install nexus3 oci://ghcr.io/stevehipwell/helm-charts/nexus3 --version 5.22.0
 ```
 
 #### Verification
@@ -33,7 +33,7 @@ helm upgrade --install nexus3 oci://ghcr.io/stevehipwell/helm-charts/nexus3 --ve
 As the OCI chart release is signed by [Cosign](https://github.com/sigstore/cosign) you can verify the chart before installing it by running the following command.
 
 ```shell
-cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp 'https://github\.com/action-stars/helm-workflows/\.github/workflows/release\.yaml@.+' --certificate-github-workflow-repository stevehipwell/helm-charts --certificate-github-workflow-name Release ghcr.io/stevehipwell/helm-charts/nexus3:5.10.0
+cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp 'https://github\.com/action-stars/helm-workflows/\.github/workflows/release\.yaml@.+' --certificate-github-workflow-repository stevehipwell/helm-charts --certificate-github-workflow-name Release ghcr.io/stevehipwell/helm-charts/nexus3:5.22.0
 ```
 
 ### Non-OCI Repository
@@ -42,7 +42,7 @@ Alternatively you can use the legacy non-OCI method via the following commands.
 
 ```shell
 helm repo add stevehipwell https://stevehipwell.github.io/helm-charts/
-helm upgrade --install nexus3 stevehipwell/nexus3 --version 5.10.0
+helm upgrade --install nexus3 stevehipwell/nexus3 --version 5.22.0
 ```
 
 ## Values
@@ -50,12 +50,14 @@ helm upgrade --install nexus3 stevehipwell/nexus3 --version 5.10.0
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | affinity | object | `{}` | Affinity settings for pod scheduling. If an explicit label selector is not provided for pod affinity or pod anti-affinity one will be created from the pod selector labels. |
+| automountServiceAccountToken | bool | `nil` | If the service account token should be mounted to the pod, this overrides `serviceAccount.automountToken`. |
 | bashImage.digest | string | `nil` | Optional image digest for the bash containers. |
 | bashImage.pullPolicy | string | `"IfNotPresent"` | Image pull policy for bash containers. |
 | bashImage.repository | string | `"cgr.dev/chainguard/bash"` | Image repository for bash containers. |
 | bashImage.tag | string | `"latest"` | Image tag for bash containers, this will be omitted if set to `-`. |
 | caCerts.enabled | bool | `false` | If `true`, add the CA certificates in the provided secret to the JVM cacerts key store. |
 | caCerts.secret | string | `nil` | Name of the secret containing the CA certificates. |
+| chownDataDir | bool | `true` | If `true`, the _chown-data-dir_ init container will be enabled, this should not be required for most CSI drivers but is left in for backwards compatibility. For new chart installs this should be set to `false`. |
 | commonLabels | object | `{}` | Labels to add to all chart resources. |
 | config.prunes | object | `{"users": false, "blobStores": false, "repositories": false}` | Prunes configuration; based on the REST API (API reference docs require an existing Nexus installation and can be found at **Administration** under _System_ → _API_). |
 | config.prunes.users | bool | `false` | If `true`, deletes existing users except admin, anonymous |
@@ -67,14 +69,20 @@ helm upgrade --install nexus3 stevehipwell/nexus3 --version 5.10.0
 | config.cleanup | list | `[]` | Cleanup configuration. |
 | config.enabled | bool | `false` | If `true` & `rootPassword.secret` is set, enable the configuration Job. |
 | config.job.affinity | object | `{}` | Affinity settings for scheduling the config job. |
+| config.job.annotations | object | `{}` | Annotations to apply to the config job. |
 | config.job.image.digest | string | `nil` | Optional image digest for the config container. |
 | config.job.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for config container. |
 | config.job.image.repository | string | `"docker.io/alpine/k8s"` | Image repository for the config container. |
 | config.job.image.tag | string | `"1.31.2"` | Image tag for config container, this will be omitted if set to `-`. |
 | config.job.nodeSelector | object | `{}` | Node labels to match for scheduling the config job. |
+| config.job.podLabels | object | `{}` | Labels to add to the config job pod. |
+| config.job.podSecurityContext | object | `{"fsGroup":200,"runAsNonRoot":false,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for the pod. |
+| config.job.resources | object | `{}` | Resources for the config container. |
+| config.job.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"privileged":false,"readOnlyRootFilesystem":true,"runAsGroup":65532,"runAsNonRoot":true,"runAsUser":65532}` | Security context for the config container containers. |
 | config.job.tolerations | list | `[]` | Node taints which will be tolerated for scheduling the config job. |
 | config.job.ttlSecondsAfterFinished | int | `600` | The number of seconds to keep the config job after it's finished. |
 | config.ldap | object | `{"authPassword":{"key":null,"secret":null},"authRealm":null,"authScheme":"simple","authUsername":null,"connectionRetryDelaySeconds":300,"connectionTimeoutSeconds":30,"enabled":false,"groupBaseDn":null,"groupIdAttribute":null,"groupMemberAttribute":null,"groupMemberFormat":null,"groupObjectClass":null,"groupSubtree":false,"groupType":"dynamic","host":null,"ldapGroupsAsRoles":false,"maxIncidentsCount":3,"name":null,"port":636,"protocol":"ldaps","searchBase":null,"useTrustStore":true,"userBaseDn":null,"userEmailAddressAttribute":"email","userIdAttribute":"sAMAccountName","userLdapFilter":null,"userMemberOfAttribute":"memberOf","userObjectClass":"user","userPasswordAttribute":null,"userRealNameAttribute":"cn","userSubtree":false}` | LDAP configuration; based on the REST API (API reference docs require an existing Nexus installation and can be found at **Administration** under _System_ → _API_). |
+| config.privileges | list | `[]` | Privileges configuration; based on the REST API (API reference docs require an existing Nexus installation and can be found at **Administration** under _System_ → _API_). |
 | config.realms.enabled | bool | `false` | If `true`, enable realms. |
 | config.realms.values | list | `[]` | List of realms to configure; can be empty or contain any of `NexusAuthenticatingRealm`, `LdapRealm`, `DockerToken`, `NpmToken`, `NuGetApiKey` or `rutauth-realm`. |
 | config.repoCredentials.enabled | bool | `false` | **DEPRECATED** - If `true`, enable repository credentials. Use inline repo password instead. |
@@ -88,6 +96,12 @@ helm upgrade --install nexus3 stevehipwell/nexus3 --version 5.10.0
 | extraVolumeMounts | list | `[]` | Extra volume mounts for the default container. |
 | extraVolumes | list | `[]` | Extra volumes for the pod. |
 | fullnameOverride | string | `nil` | Override the full name of the chart. |
+| httpRoute.annotations | object | `{}` | Annotations to add to the `HTTPRoute` resources. |
+| httpRoute.enabled | bool | `false` | If `true`, create `HTTPRoute` resources. |
+| httpRoute.hostnames | list | See _values.yaml_ | `HTTPRoute` hostnames; do not include hosts defined in `service.additionalPorts` as they will be added automatically. |
+| httpRoute.labels | object | `{}` | Labels to add to the `HTTPRoute` resources. |
+| httpRoute.parentRefs | list | See _values.yaml_ | `HTTPRoute` parent references. |
+| httpRoute.rules | list | See _values.yaml_ | `HTTPRoute` rules for the primary hostname; if not set, a default rule routing all traffic to the HTTP service port will be created. |
 | image.digest | string | `nil` | Optional image digest for the default container. |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the default container. |
 | image.repository | string | `"docker.io/sonatype/nexus3"` | Image repository for the default container. |
@@ -98,11 +112,14 @@ helm upgrade --install nexus3 stevehipwell/nexus3 --version 5.10.0
 | ingress.hosts | list | See _values.yaml_ | Ingress hosts, do not include hosts defined in `service.additionalPorts`. |
 | ingress.ingressClassName | string | `nil` | Ingress class name. |
 | ingress.tls | list | See _values.yaml_ | Ingress TLS, hosts defined in both `ingress.hosts` & `service.additionalPorts[*].hosts` should be covered. |
+| initNonRootSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"privileged":false,"readOnlyRootFilesystem":true,"runAsGroup":65532,"runAsNonRoot":true,"runAsUser":65532}` | Security context for non-root init containers. |
+| initResources | object | `{}` | Resources for the init containers (not sidecars). |
+| initRootSecurityContext | object | `{"allowPrivilegeEscalation":false,"privileged":false,"readOnlyRootFilesystem":true,"runAsGroup":0,"runAsNonRoot":false,"runAsUser":0}` | Security context for root init container. |
 | install4jAddVmParams | string | `"-Xms1024m -Xmx1024m -XX:MaxDirectMemorySize=2048m"` | Env configuration for the _Nexus3_ container. |
 | jdkImage.digest | string | `nil` | Optional image digest for the JDK container. |
 | jdkImage.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the JDK container. |
 | jdkImage.repository | string | `"docker.io/eclipse-temurin"` | Image repository for the JDK container. |
-| jdkImage.tag | string | `"17-jdk"` | Image tag for the JDK container, this will be omitted if set to `-`. |
+| jdkImage.tag | string | `"21-jdk"` | Image tag for the JDK container, this will be omitted if set to `-`. |
 | license.enabled | bool | `false` | If `true`, use the license in the provided secret. This must be set to enable [Pro features](https://help.sonatype.com/en/repository-manager-pro-features.html). |
 | license.key | string | `"nexus.license"` | Key in the secret containing the license. |
 | license.secret | string | `nil` | Name of the secret containing the license. |

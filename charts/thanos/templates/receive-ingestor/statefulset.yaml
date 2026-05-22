@@ -33,21 +33,24 @@ spec:
       {{- end }}
       {{- end }}
     spec:
-      {{- with .Values.imagePullSecrets }}
+    {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+    {{- end }}
       serviceAccountName: {{ include "thanos.receive.ingestor.serviceAccountName" . }}
-      {{- with .Values.receive.ingestor.podSecurityContext }}
+    {{- if ne .Values.receive.ingestor.automountServiceAccountToken nil }}
+      automountServiceAccountToken: {{ .Values.receive.ingestor.automountServiceAccountToken }}
+    {{- end }}
+    {{- with .Values.receive.ingestor.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.receive.ingestor.priorityClassName }}
+    {{- end }}
+    {{- with .Values.receive.ingestor.priorityClassName }}
       priorityClassName: {{ . | quote }}
-      {{- end }}
-      {{- with .Values.receive.ingestor.terminationGracePeriodSeconds }}
+    {{- end }}
+    {{- with .Values.receive.ingestor.terminationGracePeriodSeconds }}
       terminationGracePeriodSeconds: {{ . }}
-      {{- end }}
+    {{- end }}
       containers:
         - name: thanos-receive-ingestor
           {{- with .Values.receive.ingestor.securityContext }}
@@ -70,35 +73,35 @@ spec:
           {{- end }}
           args:
             - receive
-            - --log.level={{ .Values.logLevel }}
-            - --log.format={{ .Values.logFormat }}
-            - --grpc-address=0.0.0.0:10901
-            - --http-address=0.0.0.0:10902
-            - --remote-write.address=0.0.0.0:19291
+            - {{ printf "--log.level=%s" .Values.logLevel }}
+            - {{ printf "--log.format=%s" .Values.logFormat }}
+            - {{ printf "--grpc-address=0.0.0.0:%d" (int .Values.receive.ingestor.grpcPort) }}
+            - {{ printf "--http-address=0.0.0.0:%d" (int .Values.receive.ingestor.httpPort) }}
+            - {{ printf "--remote-write.address=0.0.0.0:%d" (int .Values.receive.ingestor.httpRemoteWritePort) }}
             - --objstore.config-file=/etc/thanos/objstore.yaml
           {{- if .Values.autoGomemlimit.enabled }}
             - --enable-auto-gomemlimit
           {{- with .Values.autoGomemlimit.ratio }}
-            - --auto-gomemlimit.ratio={{ . }}
+            - {{ printf "--auto-gomemlimit.ratio=%v" . }}
           {{- end }}
           {{- end }}
             - --tsdb.path=/var/thanos/receive
-            - --tsdb.retention={{ .Values.receive.retention }}
+            - {{ printf "--tsdb.retention=%s" .Values.receive.retention }}
             - --label=receive_replica="$(NAME)"
-            - {{ printf "--receive.local-endpoint=$(NAME).%s.%s-headless.svc.%s:10901" (include "thanos.receive.ingestor.fullname" .) .Release.Namespace .Values.clusterDomain }}
+            - {{ printf "--receive.local-endpoint=$(NAME).%s-headless.%s.svc.%s:%d" (include "thanos.receive.ingestor.fullname" .) .Release.Namespace .Values.clusterDomain (int .Values.receive.ingestor.grpcPort) }}
           {{- with .Values.receive.ingestor.extraArgs }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
           ports:
             - name: grpc
               protocol: TCP
-              containerPort: 10901
+              containerPort: {{ .Values.receive.ingestor.grpcPort }}
             - name: http
               protocol: TCP
-              containerPort: 10902
+              containerPort: {{ .Values.receive.ingestor.httpPort }}
             - name: http-rem-write
               protocol: TCP
-              containerPort: 19291
+              containerPort: {{ .Values.receive.ingestor.httpRemoteWritePort }}
           livenessProbe:
             {{- toYaml .Values.receive.ingestor.livenessProbe | nindent 12 }}
           readinessProbe:
@@ -153,6 +156,9 @@ spec:
         name: data
         labels:
           {{- include "thanos.receive.ingestor.selectorLabels" . | nindent 10 }}
+        {{- with .Values.receive.ingestor.persistence.labels }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         {{- with .Values.receive.ingestor.persistence.annotations }}
         annotations:
           {{- toYaml . | nindent 10 }}

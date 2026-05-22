@@ -29,21 +29,24 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      {{- with .Values.imagePullSecrets }}
+    {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+    {{- end }}
       serviceAccountName: {{ include "thanos.receive.router.serviceAccountName" . }}
-      {{- with .Values.receive.router.podSecurityContext }}
+    {{- if ne .Values.receive.router.automountServiceAccountToken nil }}
+      automountServiceAccountToken: {{ .Values.receive.router.automountServiceAccountToken }}
+    {{- end }}
+    {{- with .Values.receive.router.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.receive.router.priorityClassName }}
+    {{- end }}
+    {{- with .Values.receive.router.priorityClassName }}
       priorityClassName: {{ . | quote }}
-      {{- end }}
-      {{- with .Values.receive.router.terminationGracePeriodSeconds }}
+    {{- end }}
+    {{- with .Values.receive.router.terminationGracePeriodSeconds }}
       terminationGracePeriodSeconds: {{ . }}
-      {{- end }}
+    {{- end }}
       containers:
         - name: thanos-receive-router
           {{- with .Values.receive.router.securityContext }}
@@ -66,15 +69,15 @@ spec:
           {{- end }}
           args:
             - receive
-            - --log.level={{ .Values.logLevel }}
-            - --log.format={{ .Values.logFormat }}
-            - --grpc-address=0.0.0.0:10901
-            - --http-address=0.0.0.0:10902
-            - --remote-write.address=0.0.0.0:19291
+            - {{ printf "--log.level=%s" .Values.logLevel }}
+            - {{ printf "--log.format=%s" .Values.logFormat }}
+            - {{ printf "--grpc-address=0.0.0.0:%d" (int .Values.receive.router.grpcPort) }}
+            - {{ printf "--http-address=0.0.0.0:%d" (int .Values.receive.router.httpPort) }}
+            - {{ printf "--remote-write.address=0.0.0.0:%d" (int .Values.receive.router.httpRemoteWritePort) }}
           {{- if .Values.autoGomemlimit.enabled }}
             - --enable-auto-gomemlimit
           {{- with .Values.autoGomemlimit.ratio }}
-            - --auto-gomemlimit.ratio={{ . }}
+            - {{ printf "--auto-gomemlimit.ratio=%v" . }}
           {{- end }}
           {{- end }}
             - --receive.hashrings-file=/etc/thanos/hashrings.json
@@ -86,13 +89,13 @@ spec:
           ports:
             - name: grpc
               protocol: TCP
-              containerPort: 10901
+              containerPort: {{ .Values.receive.router.grpcPort }}
             - name: http
               protocol: TCP
-              containerPort: 10902
+              containerPort: {{ .Values.receive.router.httpPort }}
             - name: http-rem-write
               protocol: TCP
-              containerPort: 19291
+              containerPort: {{ .Values.receive.router.httpRemoteWritePort }}
           livenessProbe:
             {{- toYaml .Values.receive.router.livenessProbe | nindent 12 }}
           readinessProbe:

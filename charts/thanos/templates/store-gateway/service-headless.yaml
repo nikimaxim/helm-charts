@@ -1,3 +1,4 @@
+{{- if .Values.storeGateway.enabled -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -5,6 +6,9 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "thanos.storeGateway.labels" . | nindent 4 }}
+  {{- with .Values.storeGateway.service.labels }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- with .Values.storeGateway.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -19,11 +23,12 @@ spec:
 {{- end }}
   ports:
     - name: grpc
-      port: 10901
+      port: {{ .Values.storeGateway.service.grpcPort }}
       targetPort: grpc
     - name: http
       protocol: TCP
-      port: 10902
+      port: {{ .Values.storeGateway.service.httpPort }}
       targetPort: http
   selector:
     {{- include "thanos.storeGateway.selectorLabels" . | nindent 4 }}
+{{- end -}}

@@ -14,9 +14,77 @@
 
 ## [UNRELEASED]
 
+## [v1.23.1] - 2026-05-20
+
+### Added
+
+- Add support for specifying labels on persistence volume claims. ([#1372](https://github.com/stevehipwell/helm-charts/pull/1372)) @stevehipwell
+- Add support for GRPC ingress to the _Thanos Query_ component. ([#1372](https://github.com/stevehipwell/helm-charts/pull/1372)) @stevehipwell
+- Add optional `HTTPRoute` resource support to the _Query_, _Query Frontend_, _Receive Router_, & _Rule_ components via the new `httpRoute` values. ([#1374](https://github.com/stevehipwell/helm-charts/pull/1374)) @stevehipwell
+- Add optional `GRPCRoute` resource support to the _Query_ component via the new `query.grpcRoute` values. ([#1374](https://github.com/stevehipwell/helm-charts/pull/1374)) @stevehipwell
+- Add `receive.router.service.trafficDistribution` and `rule.service.trafficDistribution` values to allow configuring the `trafficDistribution` ([#1366](https://github.com/stevehipwell/helm-charts/pull/1366)) @draegerben
+- Add support for specifying labels on services. ([#1375](https://github.com/stevehipwell/helm-charts/pull/1375)) @stevehipwell
+
+### Fixed
+
+- Fix formatting when setting `--auto-gomemlimit.ratio` flag. ([#1345](https://github.com/stevehipwell/helm-charts/pull/1345)) @Poil
+
+## [v1.23.0] - 2026-03-02
+
+### Added
+
+- Added `rule.overrideQueryEndpoints` value to allow overriding the _Rule_ component query endpoints (`--query`). ([#1313](https://github.com/stevehipwell/helm-charts/pull/1313)) _@shousper_
+
 ### Changed
 
-- Update `jimmidyson/configmap-reload` OCI image from `0.14.0` to [`0.15.0`](https://github.com/jimmidyson/configmap-reload/releases/tag/v0.15.0). ([#1168](https://github.com/stevehipwell/helm-charts/pull/1168)) _@stevehipwell_
+- Update the _Thanos_ OCI image to [v0.41.0](https://github.com/thanos-io/thanos/releases/tag/v0.41.0). ([#1335](https://github.com/stevehipwell/helm-charts/pull/1335)) _@stevehipwell_
+
+### Fixed
+
+- Fixed the _Receive Ingestor_ `--receive.local-endpoint` DNS format. ([#1313](https://github.com/stevehipwell/helm-charts/pull/1313)) _@shousper_
+
+## [v1.22.1] - 2025-12-10
+
+### Added
+
+- Add support to explicitly set the `automountServiceAccountToken` field on all pods via the `automountServiceAccountToken` value.([#1296](https://github.com/stevehipwell/helm-charts/pull/1296)) _@stevehipwell_
+
+## [v1.22.0] - 2025-11-04
+
+### Added
+
+- Add possibility to configure HTTP and GRPC ports. ([#1241](https://github.com/stevehipwell/helm-charts/issues/1241)) _@TTRCmedia_
+- Enable (default) or disable GRPC DNS Service Discovery. ([#1241](https://github.com/stevehipwell/helm-charts/issues/1241)) _@TTRCmedia_
+- Add possibility to configure `jobLabel` for the ServiceMonitors. ([#1241](https://github.com/stevehipwell/helm-charts/issues/1241)) _@TTRCmedia_
+- Add support for templating the `additionalEndpoints` and `additionalEndpointGroups` values. ([#1259](https://github.com/stevehipwell/helm-charts/pull/1259)) _@stevehipwell_
+- Add support for granular control of GRPC & HTTP port rather than using a single global port value. ([#1281](https://github.com/stevehipwell/helm-charts/pull/1281)) _@stevehipwell_
+- Add support for specifying service type for each component. ([#1281](https://github.com/stevehipwell/helm-charts/pull/1281)) _@stevehipwell_
+- Add support to conditionally enable/disable the _Query_ component. ([#1281](https://github.com/stevehipwell/helm-charts/pull/1281)) _@stevehipwell_
+
+### Changed
+
+- Update the _Thanos_ OCI image to [v0.40.1](https://github.com/thanos-io/thanos/releases/tag/v0.40.1). ([#1281](https://github.com/stevehipwell/helm-charts/pull/1281)) _@stevehipwell_
+
+### Removed
+
+- Remove all references to `existingClaim` from the values under `persistence` as this was never used. ([#1232](https://github.com/stevehipwell/helm-charts/pull/1232)) _@stevehipwell_
+
+## [v1.21.1] - 2025-07-22
+
+### Changed
+
+- Update the _Thanos_ OCI image to [v0.39.2](https://github.com/thanos-io/thanos/releases/tag/v0.39.2). ([#1219](https://github.com/stevehipwell/helm-charts/pull/1219)) _@stevehipwell_
+
+## [v1.21.0] - 2025-07-15
+
+### Added
+
+- Add support for disabling the _Thanos Store Gateway_ component by setting the `storeGateway.enabled` chart value to `false` (it defaults to `true`). This allows users to choose if they need the _Thanos Store Gateway_ component and its associated resources. ([#1209](https://github.com/stevehipwell/helm-charts/pull/1209)) _@MeNsaaH_
+
+### Changed
+
+- Update `ghcr.io/jimmidyson/configmap-reload` OCI image from `0.14.0` to [`0.15.0`](https://github.com/jimmidyson/configmap-reload/releases/tag/v0.15.0). ([#1168](https://github.com/stevehipwell/helm-charts/pull/1168)) _@stevehipwell_
+- Update the _Thanos_ OCI image to [v0.39.1](https://github.com/thanos-io/thanos/releases/tag/v0.39.1). ([#1215](https://github.com/stevehipwell/helm-charts/pull/1215)) _@stevehipwell_
 
 ## [v1.20.0] - 2025-04-09
 
@@ -557,6 +625,12 @@
 RELEASE LINKS
 -->
 [UNRELEASED]: https://github.com/stevehipwell/helm-charts/tree/main/charts/thanos
+[v1.23.1]: https://github.com/stevehipwell/helm-charts/releases/tag/thanos-1.23.1
+[v1.23.0]: https://github.com/stevehipwell/helm-charts/releases/tag/thanos-1.23.0
+[v1.22.1]: https://github.com/stevehipwell/helm-charts/releases/tag/thanos-1.22.1
+[v1.22.0]: https://github.com/stevehipwell/helm-charts/releases/tag/thanos-1.22.0
+[v1.21.1]: https://github.com/stevehipwell/helm-charts/releases/tag/thanos-1.21.1
+[v1.21.0]: https://github.com/stevehipwell/helm-charts/releases/tag/thanos-1.21.0
 [v1.20.0]: https://github.com/stevehipwell/helm-charts/releases/tag/thanos-1.20.0
 [v1.19.2]: https://github.com/stevehipwell/helm-charts/releases/tag/thanos-1.19.2
 [v1.19.1]: https://github.com/stevehipwell/helm-charts/releases/tag/thanos-1.19.1
