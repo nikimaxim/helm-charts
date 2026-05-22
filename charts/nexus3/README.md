@@ -61,7 +61,7 @@ helm upgrade --install nexus3 stevehipwell/nexus3 --version 5.22.0
 | commonLabels | object | `{}` | Labels to add to all chart resources. |
 | config.prunes | object | `{"users": false, "blobStores": false, "repositories": false}` | Prunes configuration; based on the REST API (API reference docs require an existing Nexus installation and can be found at **Administration** under _System_ → _API_). |
 | config.prunes.users | bool | `false` | If `true`, deletes existing users except admin, anonymous |
-| config.prunes.blobStores | bool | `false` | If `true`, deletes existing blob stores |
+| config.prunes.blobStores | bool | `false` | If `true`, deletes existing blob stores(!!!This will delete all data in the storage!!!) |
 | config.prunes.repositories | bool | `false` | If `true`, deletes existing repositories |
 | config.anonymous.enabled | bool | `false` | If `true`, enable anonymous access. |
 | config.anonymous.roles | list | `["nx-anonymous","nx-metrics"]` | Roles for anonymous access. |

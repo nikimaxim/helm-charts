@@ -40,7 +40,7 @@ if [[ -f "${json_file}" ]]; then
     error "Could not configure anonymous access (status code ${status_code})."
   fi
 
-  echo "Anonymous access configured. Http response code '${status_code}'."
+  echo "Anonymous access configured (status code ${status_code})."
 fi
 
 
@@ -54,7 +54,7 @@ if [[ -f "${json_file}" ]]; then
     error "Could not configure realms (status code ${status_code})."
   fi
 
-  echo "Realms configured. Http response code '${status_code}'."
+  echo "Realms configured (status code ${status_code})."
 fi
 
 
@@ -70,16 +70,16 @@ if [[ "${status_code}" -eq 200 ]]; then
       status_code=$(curl -sS -o /dev/null -w "%{http_code}" -X DELETE -H 'Content-Type: application/json' \
         -u "${NEXUS_USER}:${NEXUS_PASSWORD}" "${NEXUS_HOST}/service/rest/v1/blobstores/${name}")
       if [[ "${status_code}" -eq 204 ]]; then
-        echo "Blobstores deleted '${name}'. Http response code '${status_code}'."
+        echo "Blobstores deleted '${name}' (status code ${status_code})."
       else
-        error "Problems with deleting a blobstore '${name}'. Http response code '${status_code}'."
+        error "Problems with deleting a blobstore '${name}' (status code ${status_code})."
       fi
     done
   else
     echo "The blobstores pruning feature is disabled."
   fi
 else
-  error "Problems with getting blobstores. Http response code '${status_code}'."
+  error "Problems with getting blobstores (status code ${status_code})."
 fi
 
 for json_file in "${CONFIG_DIR}"/conf/*-blobstore.json; do
@@ -110,7 +110,7 @@ for json_file in "${CONFIG_DIR}"/conf/*-blobstore.json; do
       fi
     fi
 
-    echo "Blob store '${name}' configured. Http response code '${status_code}'."
+    echo "Blob store '${name}' configured (status code ${status_code})."
   fi
 done
 
@@ -139,7 +139,7 @@ for script_file in /scripts/*.groovy; do
       fi
     fi
 
-    echo "Script '${name}' updated. Http response code '${status_code}'."
+    echo "Script '${name}' updated (status code ${status_code})."
   fi
 done
 
@@ -155,7 +155,7 @@ for json_file in "${CONFIG_DIR}"/conf/*-cleanup.json; do
       error "Could not configure cleanup policy '${name}' (status code ${status_code})."
     fi
 
-    echo "Cleanup policy '${name}' configured. Http response code '${status_code}'."
+    echo "Cleanup policy '${name}' configured (status code ${status_code})."
   fi
 done
 
@@ -172,16 +172,16 @@ if [[ "${status_code}" -eq 200 ]]; then
       status_code=$(curl -sS -o /dev/null -w "%{http_code}" -X DELETE -H 'Content-Type: application/json' \
         -u "${NEXUS_USER}:${NEXUS_PASSWORD}" "${NEXUS_HOST}/service/rest/v1/repositories/${name}")
       if [[ "${status_code}" -eq 204 ]]; then
-        echo "Repository deleted '${name}'. Http response code '${status_code}'."
+        echo "Repository deleted '${name}' (status code ${status_code})."
       else
-        error "Problems with deleting a repository '${name}'. Http response code '${status_code}'."
+        error "Problems with deleting a repository '${name}' (status code ${status_code})."
       fi
     done
   else
     echo "The repository pruning feature is disabled."
   fi
 else
-  error "Problems with getting repositories. Http response code '${status_code}'."
+  error "Problems with getting repositories (status code ${status_code})."
 fi
 
 for json_file in "${CONFIG_DIR}"/conf/*-repo.json; do
@@ -228,7 +228,7 @@ for json_file in "${CONFIG_DIR}"/conf/*-repo.json; do
       fi
     fi
 
-    echo "Repository '${name}' configured. Http response code '${status_code}'."
+    echo "Repository '${name}' configured (status code ${status_code})."
   fi
 done
 
@@ -277,7 +277,7 @@ for json_file in "${CONFIG_DIR}"/conf/*-role.json; do
       fi
     fi
 
-    echo "Role '${id}' configured. Http response code '${status_code}'."
+    echo "Role '${id}' configured (status code ${status_code})."
   fi
 done
 
@@ -295,9 +295,9 @@ if [[ "${status_code}" -eq 200 ]]; then
         status_code=$(curl -sS -o /dev/null -w "%{http_code}" -X DELETE -H 'Content-Type: application/json' \
           -u "${NEXUS_USER}:${NEXUS_PASSWORD}" "${NEXUS_HOST}/service/rest/v1/security/users/${user_id}")
         if [[ "${status_code}" -eq 204 ]]; then
-          echo "User deleted '${user_id}'. Http response code '${status_code}'."
+          echo "User deleted '${user_id}' (status code ${status_code})."
         else
-          error "Problems with deleting a user '${user_id}'. Http response code '${status_code}'."
+          error "Problems with deleting a user '${user_id}' (status code ${status_code})."
         fi
       fi
     done
@@ -305,7 +305,7 @@ if [[ "${status_code}" -eq 200 ]]; then
     echo "The user pruning feature is disabled."
   fi
 else
-  error "Problems with getting users. Http response code '${status_code}'."
+  error "Problems with getting users (status code ${status_code})."
 fi
 
 for json_file in "${CONFIG_DIR}"/conf/*-user.json; do
@@ -340,7 +340,7 @@ for json_file in "${CONFIG_DIR}"/conf/*-user.json; do
       fi
     fi
 
-    echo "User '${id}' configured. Http response code '${status_code}'."
+    echo "User '${id}' configured (status code ${status_code})."
   fi
 done
 
@@ -378,7 +378,7 @@ if [[ -f "${json_file}" ]]; then
     fi
   fi
 
-  echo "LDAP '${name}' configured. Http response code '${status_code}'."
+  echo "LDAP '${name}' configured (status code ${status_code})."
 fi
 
 
@@ -393,7 +393,7 @@ for json_file in "${CONFIG_DIR}"/conf/*-task.json; do
       error "Could not configure task '${name}' (status code ${status_code})."
     fi
 
-    echo "Task '${name}' configured. Http response code '${status_code}'."
+    echo "Task '${name}' configured (status code ${status_code})."
   fi
 done
 

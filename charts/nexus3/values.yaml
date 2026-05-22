@@ -369,7 +369,6 @@ config:
     affinity: {}
     # -- Node taints which will be tolerated for scheduling the config job.
     tolerations: []
-    
     # -- Annotations to apply to the config job.
     annotations: {}
     # -- Labels to add to the config job pod.
@@ -398,7 +397,7 @@ config:
   prunes:
     # -- If `true`, deletes existing users except admin, anonymous
     users: false
-    # -- If `true`, deletes existing blob stores
+    # -- If `true`, deletes existing blob stores(!!!This will delete all data in the storage!!!)
     blobStores: false
     # -- If `true`, deletes existing repositories
     repositories: false
